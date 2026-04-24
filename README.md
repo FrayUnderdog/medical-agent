@@ -1,53 +1,17 @@
-# Medical Agent MVP (Mock, Interview-Ready)
+# Medical Agent (version-1: MVP)
 
-Minimal FastAPI backend that demonstrates a clean, explainable "medical agent" architecture without any real LLM, database, or frontend.
+Minimal FastAPI backend that demonstrates a clean, explainable "medical agent" architecture with fine-tuned LLM and user-friendly frontend.
 
 ## What this is
 
 - FastAPI service with:
   - `GET /health`
   - `POST /chat`
-- In-memory session state (no DB)
+- In-memory session state
 - A simple orchestrator agent that calls mock tools
 - A safety guardrail layer that short-circuits emergency symptoms
 - A model client abstraction (defaults to deterministic mock; optional OpenAI integration)
 
-## Interview package
-
-### 1. 90-second project introduction
-
-This is a small **FastAPI** service with `/health` and `/chat` that demonstrates how I’d structure a **medical-style agent** without a database. Each chat request loads an **in-memory session** (keyed by `session_id`), runs **guardrails** first to catch obvious emergency phrasing, then an **orchestrator** calls **mock tools** (symptom extraction, triage, plus placeholders for medication safety, knowledge, and handoff). A **`ModelClient`** turns structured tool output into a user-facing reply. By default it uses a deterministic **`MockModelClient`**, but you can optionally enable a real LLM via **OpenAI** by setting `OPENAI_API_KEY`. The point for interviews is the **separation of concerns**: safety is not buried in the “model,” tools return structured data, and the text generator is a replaceable interface—so a real LLM or real services can slot in without rewriting the whole app.
-
-### 2. Architecture (five bullets)
-
-- **HTTP API** — exposes `/health` and `/chat`; maps JSON to a session + message, returns reply and optional debug-shaped `tool_outputs`.
-- **Session memory** — in-process only: each `session_id` maps to one conversation (history and a few last-known fields). Not durable across restarts.
-- **Guardrails** — rule-based pre-check; if it fires, the pipeline **short-circuits** to a safe emergency message instead of “helpful” triage.
-- **Orchestrator + tools** — deterministic pipeline: extract → triage → placeholders; tools are the place for **factual** or **policy** steps you can test in isolation.
-- **Model interface** — today a mock formatter; in production you’d implement the same contract with an LLM client, prompts, and tracing—without changing the route or tool shapes.
-
-### 3. Top 10 likely follow-up questions (short answers)
-
-1. **Why no database?** — Keeps the demo small; sessions are a swappable concern—add Redis/Postgres if you need persistence or multi-instance.
-2. **Where would a real LLM go?** — Behind the `ModelClient` interface (`generate`); pass structured `context` and enforce policies on inputs/outputs.
-3. **How are guardrails implemented?** — Substring/phrase heuristics for a demo; you’d add tests, expand rules, and possibly a classifier with human review in a real product.
-4. **How do you limit hallucination risk?** — Tools ground behavior; the model only narrates `context`. With an LLM, add retrieval citations, stricter system prompts, and refusal on missing data.
-5. **How does triage work?** — It’s a **mock** rule: not clinically validated—suitable to show the *shape* of triage, not to ship.
-6. **How would you test it?** — Unit-test tools and guardrails; integration tests on `/chat` for emergency vs non-emergency; contract tests on response shape.
-7. **Multi-turn?** — Same `session_id` ties turns together; a richer system would pass history or a summary into the model step (not yet the focus of the mock).
-8. **Multiple server workers?** — In-memory sessions won’t be shared; use external session store + sticky routing or a shared cache.
-9. **PII/PHI?** — Demo stores messages in memory only—**no** HIPAA story; real deployment needs minimization, retention, encryption, access control, and audit.
-10. **What did you actually prove?** — A clear **agent loop** and **safety-first ordering**; everything else is intentionally stubbed to stay readable in an interview.
-
-### 4. Known limitations and next-step improvements
-
-**Limitations**
-
-- **No** real clinical validation; triage and extraction are **toys** for structure, not for patients.
-- **In-memory** sessions: **lost on process restart**; not suitable for production reliability as-is.
-- **Guardrails** are narrow; they can false-negative (miss emergencies) and false-positive (block borderline cases)—real systems need monitoring and escalation paths.
-- **No** authentication, rate limits, or structured logging/metrics in this MVP.
-- **Mock model** does not use full conversation context for generation (session history is stored for a future “real” model path).
 
 **Next steps (practical order)**
 
@@ -101,7 +65,7 @@ This repo includes a tiny local RAG pipeline over markdown files in `docs/medica
 python run_eval.py
 ```
 
-## Tool schema (interview)
+## Tool schema
 
 Each pipeline step is documented as a **`ToolSpec`** (`tool_specs.py`): `name`, `description`, `input_fields`, `output_fields`. The registry **`TOOL_SPECS`** maps tool name → spec (including **guardrails** as the pre-step, plus all `ToolResult.name` values from `tools.py`).
 
