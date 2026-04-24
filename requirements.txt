@@ -1,0 +1,9 @@
+fastapi
+uvicorn[standard]
+openai
+python-dotenv
+langchain
+langchain-text-splitters
+langchain-openai
+langchain-chroma
+chromadb

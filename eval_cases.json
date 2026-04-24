@@ -1,0 +1,46 @@
+[
+  {
+    "name": "emergency_guardrail_chest_pain",
+    "message": "I have chest pain and trouble breathing",
+    "expected": {
+      "guardrail_triggered": true,
+      "triage_level": "emergency"
+    }
+  },
+  {
+    "name": "mild_fever_two_days_self_care",
+    "message": "I have a fever for 2 days",
+    "expected": {
+      "guardrail_triggered": false,
+      "triage_level": "self_care",
+      "rag_source_contains": "fever.md"
+    }
+  },
+  {
+    "name": "fever_four_days_urgent",
+    "message": "I have had a fever for 4 days",
+    "expected": {
+      "guardrail_triggered": false,
+      "triage_level": "urgent",
+      "rag_source_contains": "fever.md"
+    }
+  },
+  {
+    "name": "cough_with_blood_week_urgent",
+    "message": "I have productive cough and blood for about a week",
+    "expected": {
+      "guardrail_triggered": false,
+      "triage_level": "urgent",
+      "rag_source_contains": "cough.md"
+    }
+  },
+  {
+    "name": "headache_single_doc_rag",
+    "message": "I have a severe headache",
+    "expected": {
+      "guardrail_triggered": false,
+      "triage_level": "self_care",
+      "rag_source_contains": "headache.md"
+    }
+  }
+]

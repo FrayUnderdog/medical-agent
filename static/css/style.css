@@ -1,0 +1,41 @@
+/* Medical Agent MVP — small additions on top of Tailwind */
+
+html {
+  scroll-behavior: smooth;
+}
+
+#chatScroll {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(148 163 184 / 0.6) transparent;
+}
+
+#chatScroll::-webkit-scrollbar {
+  width: 8px;
+}
+
+#chatScroll::-webkit-scrollbar-thumb {
+  background: rgb(148 163 184 / 0.45);
+  border-radius: 999px;
+}
+
+.dark #chatScroll::-webkit-scrollbar-thumb {
+  background: rgb(71 85 105 / 0.6);
+}
+
+.emergency-strip {
+  animation: emergency-pulse 2s ease-in-out infinite;
+}
+
+@keyframes emergency-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgb(239 68 68 / 0.35);
+  }
+  50% {
+    box-shadow: 0 0 0 6px rgb(239 68 68 / 0);
+  }
+}
+
+textarea:focus {
+  outline: none;
+}
