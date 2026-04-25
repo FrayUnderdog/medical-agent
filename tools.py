@@ -171,6 +171,10 @@ def knowledge_rag_tool(query: str, *, top_k: int = 4) -> ToolResult:
 
     res = retrieve_medical_context(query, top_k=top_k)
     output: dict = {
+        "recall_top_k": res.recall_top_k,
+        "rerank_top_n": res.rerank_top_n,
+        "reranker_provider": res.reranker_provider,
+        "reranker_used": res.reranker_used,
         "retrieved_context": res.retrieved_context,
         "sources": res.sources,
         "top_k": res.top_k,

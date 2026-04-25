@@ -92,6 +92,23 @@ This repo includes a tiny local RAG pipeline over markdown files in `docs/medica
 - Embeddings use OpenAI `text-embedding-3-small` when `OPENAI_API_KEY` is set.
 - If embeddings fail or the key is missing, it falls back to simple keyword retrieval.
 
+## Two-stage RAG (optional reranking)
+
+When Chroma + embeddings are available, retrieval is **two-stage**:
+
+- **Embedding recall**: fetch `recall_top_k = 6` candidate chunks (fast, high-recall).
+- **Reranker precision**: optionally rerank candidates with a local **BGE reranker** and keep `rerank_top_n = 3` final chunks (higher precision for the final answer).
+
+Why these numbers for a demo:
+
+- `6` candidates gives the reranker enough choices without slowing down much.
+- `3` final chunks keeps prompts short and explainable in an interview.
+
+Fallback behavior (stability-first):
+
+- If the reranker model/deps aren’t available or local inference fails, the system falls back to **embedding-only** ordering.
+- If embeddings fail or `OPENAI_API_KEY` is missing, it falls back to **keyword retrieval**.
+
 ## Observability and eval
 
 - **`tool_trace`** on `POST /chat`: ordered steps, each with `tool`, `status`, `summary`, and optional **`provider`** (for example RAG `retrieval_provider`, or `mock` / `openai` on the final model step).
@@ -111,6 +128,43 @@ from tool_specs import TOOL_SPECS
 for name, spec in TOOL_SPECS.items():
     print(name, "—", spec.description)
 ```
+
+## LangGraph next-version design
+
+This repo keeps **`orchestrator.py`** and **`POST /chat`** as the stable MVP. An **optional** LangGraph experiment lives in **`graph_orchestrator.py`**: same building blocks (`guardrails.py`, `tools.py`, `rag_service.py`, `model.py`) wired as an explicit graph for teaching and iteration.
+
+### State
+
+**`MedicalAgentState`** (`TypedDict`) holds the working slice of data: user `message`, guardrail flags, extracted `symptoms` / `duration_days`, `triage_level`, optional RAG fields (`retrieved_context`, `rag_sources`, `retrieval_provider`), handoff recommendation, and final `reply`. Nodes return **partial updates**; LangGraph merges them into state.
+
+### Nodes
+
+| Node | Role |
+|------|------|
+| `guardrails_node` | Runs `Guardrails().check(message)`; may set `triage_level` to `emergency` when triggered. |
+| `symptom_extraction_node` | Wraps `symptom_extraction`. |
+| `triage_node` | Wraps `triage_suggestion` (passes original message for phrase rules). |
+| `rag_retrieval_node` | Wraps `knowledge_rag_tool` (Chroma + embeddings or keyword fallback). |
+| `human_handoff_node` | Wraps `human_handoff_placeholder` when escalation is on-path. |
+| `final_response_node` | Guardrail short-circuit returns `safe_reply`; otherwise calls `ModelClient.generate` with the same style of `context` as the stable orchestrator. |
+
+### Edges
+
+- After **guardrails**: if **`guardrail_triggered`** → **`human_handoff`** → **`final_response`**; else → **`symptom_extraction`** → **`triage`**.
+- After **triage**: if **`triage_level`** is **`urgent`** or **`emergency`** → **`human_handoff`** → **`final_response`** (RAG skipped on this path); else → **`rag_retrieval`** → **`final_response`**.
+
+### Why LangGraph helps (interview soundbite)
+
+Linear code is fine for a demo, but real clinical workflows branch on **risk**, **missing data**, and **tool failures** (retrieval, policy APIs, human-in-the-loop). A **graph** makes branches, merges, and retries **first-class**: reviewers see the control flow, you can attach telemetry per node, and you can later swap nodes for async tools or checkpoints—**without** rewriting the HTTP contract or deleting the stable orchestrator.
+
+### Try it locally
+
+```bash
+pip install -r requirements.txt
+python test_graph_demo.py
+```
+
+Quick one-off from Python: `from graph_orchestrator import run_graph_demo` then `run_graph_demo("your message")` (uses the same model selection as the app via `get_default_model_client()`).
 
 ## Example request
 

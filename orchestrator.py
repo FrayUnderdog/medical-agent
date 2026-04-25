@@ -55,7 +55,7 @@ class Orchestrator:
         # Always store user message.
         session.history.append({"role": "user", "content": user_message})
 
-        if guardrail.triggered:
+        if guardrail.triggered and guardrail.severity == "emergency":
             session.history.append({"role": "assistant", "content": guardrail.safe_reply})
             self._store.touch(session)
             reason = (guardrail.reason or "emergency pattern")[:200]
@@ -66,12 +66,26 @@ class Orchestrator:
                 triage_level="emergency",
                 retrieval_provider=None,
                 tool_trace=trace,
-                tool_outputs={"guardrails": {"triggered": True, "reason": guardrail.reason}},
+                tool_outputs={
+                    "guardrails": {
+                        "triggered": True,
+                        "severity": guardrail.severity,
+                        "matched_rule_ids": guardrail.matched_rule_ids,
+                        "matched_phrases": guardrail.matched_phrases,
+                        "reason": guardrail.reason,
+                    }
+                },
             )
 
         trace: list[dict[str, Any]] = [
-            _trace("guardrails", status="ok", summary="no emergency phrases matched"),
+            _trace(
+                "guardrails",
+                status="flagged" if guardrail.triggered else "ok",
+                summary=(guardrail.reason or "no red flags matched")[:200],
+                provider=guardrail.severity,
+            ),
         ]
+        urgent_policy = bool(guardrail.triggered and guardrail.severity == "urgent")
 
         extracted = symptom_extraction(user_message)
         symptoms = extracted.output["symptoms"]
@@ -86,6 +100,8 @@ class Orchestrator:
 
         triage = triage_suggestion(symptoms=symptoms, duration_days=duration_days, message=user_message)
         triage_level = triage.output["triage_level"]
+        if urgent_policy and triage_level in {"routine", "self_care"}:
+            triage_level = "urgent"
         trace.append(
             _trace(
                 triage.name,
@@ -105,8 +121,9 @@ class Orchestrator:
 
         knowledge = knowledge_rag_tool(user_message, top_k=4)
         kprov = knowledge.output.get("retrieval_provider")
+        krerank = knowledge.output.get("reranker_used")
         ksrc = knowledge.output.get("sources") or []
-        ksum = f"top_k={knowledge.output.get('top_k')}, sources={ksrc[:3]}"
+        ksum = f"top_k={knowledge.output.get('top_k')}, rerank={bool(krerank)}, sources={ksrc[:3]}"
         trace.append(
             _trace(
                 knowledge.name,
@@ -116,7 +133,7 @@ class Orchestrator:
             )
         )
 
-        handoff = human_handoff_placeholder(triage_level=triage_level, guardrail_triggered=False)
+        handoff = human_handoff_placeholder(triage_level=triage_level, guardrail_triggered=urgent_policy)
         trace.append(
             _trace(
                 handoff.name,
@@ -151,16 +168,41 @@ class Orchestrator:
 
         tool_outputs = {
             extracted.name: extracted.output,
-            triage.name: triage.output,
+            triage.name: {"triage_level": triage_level},
             med_safety.name: med_safety.output,
             knowledge.name: knowledge.output,
             handoff.name: handoff.output,
-            "guardrails": {"triggered": False},
+            "guardrails": {
+                "triggered": bool(guardrail.triggered),
+                "severity": guardrail.severity,
+                "matched_rule_ids": guardrail.matched_rule_ids,
+                "matched_phrases": guardrail.matched_phrases,
+                "reason": guardrail.reason,
+            },
         }
+
+        # Output consistency validation (minimal, deterministic).
+        reply_l = reply.lower()
+        implies_emergency = any(
+            p in reply_l
+            for p in (
+                "call your local emergency number",
+                "nearest er",
+                "emergency room",
+                "call 911",
+            )
+        )
+        if implies_emergency and triage_level in {"routine", "self_care"}:
+            triage_level = "emergency"
+            tool_outputs[triage.name] = {"triage_level": triage_level}
+
+        if triage_level in {"urgent", "emergency"} and not handoff.output.get("recommended"):
+            tool_outputs[handoff.name]["recommended"] = True
+            tool_outputs[handoff.name]["reason"] = "triage"
 
         return OrchestratorResult(
             reply=reply,
-            guardrail_triggered=False,
+            guardrail_triggered=bool(guardrail.triggered),
             triage_level=triage_level,
             retrieval_provider=knowledge.output.get("retrieval_provider"),
             tool_trace=trace,

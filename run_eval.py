@@ -64,6 +64,15 @@ def main() -> int:
             print(f"FAIL  {name}")
             for e in errors:
                 print(f"        {e}")
+            gr = result.tool_outputs.get("guardrails") or {}
+            if gr:
+                meta = {
+                    "severity": gr.get("severity"),
+                    "matched_rule_ids": gr.get("matched_rule_ids"),
+                    "matched_phrases": gr.get("matched_phrases"),
+                    "reason": gr.get("reason"),
+                }
+                print(f"        guardrails: {meta}")
         else:
             passed += 1
             print(f"PASS  {name}")

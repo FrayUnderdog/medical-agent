@@ -21,14 +21,17 @@ class ToolSpec:
 TOOL_SPECS: dict[str, ToolSpec] = {
     "guardrails": ToolSpec(
         name="guardrails",
-        description="Rule-based safety pre-check on the raw user message; may short-circuit the pipeline.",
+        description="Structured safety-policy pre-check on the raw user message; emergency short-circuits, urgent escalates.",
         input_fields={
             "message": "str — user utterance before tools or model.",
         },
         output_fields={
-            "triggered": "bool — whether an emergency pattern matched.",
-            "reason": "str | null — short explanation when triggered.",
-            "safe_reply": "str | null — canned emergency reply when triggered.",
+            "triggered": "bool — whether any red-flag rule matched.",
+            "severity": "str | null — emergency | urgent when triggered.",
+            "matched_rule_ids": "list[str] — ids of matched rules.",
+            "matched_phrases": "list[str] — matched substrings.",
+            "reason": "str | null — short explanation.",
+            "safe_reply": "str | null — safety message (emergency or urgent guidance).",
         },
     ),
     "symptom_extraction": ToolSpec(

@@ -15,6 +15,10 @@ class RagResult:
     sources: list[str]
     top_k: int
     retrieval_provider: str
+    recall_top_k: int = 0
+    rerank_top_n: int = 0
+    reranker_provider: str | None = None
+    reranker_used: bool = False
     retrieval_error: str | None = None
 
 
@@ -53,6 +57,10 @@ def _keyword_retrieve(query: str, *, top_k: int, retrieval_error: str | None = N
             sources=[],
             top_k=effective_k,
             retrieval_provider="keyword_fallback",
+            recall_top_k=0,
+            rerank_top_n=0,
+            reranker_provider=None,
+            reranker_used=False,
             retrieval_error=retrieval_error,
         )
 
@@ -66,6 +74,10 @@ def _keyword_retrieve(query: str, *, top_k: int, retrieval_error: str | None = N
                     sources=[source],
                     top_k=1,
                     retrieval_provider="keyword_fallback",
+                    recall_top_k=0,
+                    rerank_top_n=0,
+                    reranker_provider=None,
+                    reranker_used=False,
                     retrieval_error=retrieval_error,
                 )
 
@@ -96,6 +108,10 @@ def _keyword_retrieve(query: str, *, top_k: int, retrieval_error: str | None = N
         sources=sources,
         top_k=effective_k,
         retrieval_provider="keyword_fallback",
+        recall_top_k=0,
+        rerank_top_n=0,
+        reranker_provider=None,
+        reranker_used=False,
         retrieval_error=retrieval_error,
     )
 
@@ -129,6 +145,10 @@ def retrieve_medical_context(query: str, *, top_k: int = 4) -> RagResult:
                 sources=[],
                 top_k=top_k,
                 retrieval_provider="chroma_openai_embeddings",
+                recall_top_k=0,
+                rerank_top_n=0,
+                reranker_provider=None,
+                reranker_used=False,
             )
 
         splitter = RecursiveCharacterTextSplitter(chunk_size=700, chunk_overlap=120)
@@ -155,7 +175,9 @@ def retrieve_medical_context(query: str, *, top_k: int = 4) -> RagResult:
         if existing == 0:
             vs.add_documents(chunks)
 
-        results = vs.similarity_search(query, k=top_k)
+        recall_top_k = 6
+        rerank_top_n = 3
+        results = vs.similarity_search(query, k=recall_top_k)
 
         retrieved_chunks: list[str] = []
         sources: list[str] = []
@@ -165,11 +187,49 @@ def retrieve_medical_context(query: str, *, top_k: int = 4) -> RagResult:
             if src and src not in sources:
                 sources.append(str(src))
 
+        reranker_used = False
+        reranker_provider: str | None = None
+        provider = "chroma_openai_embeddings"
+
+        # Optional second-stage reranking.
+        try:
+            from reranker import rerank
+
+            rr = rerank(query, retrieved_chunks, top_n=rerank_top_n)
+            reranker_used = True
+            reranker_provider = rr.provider
+            provider = "chroma_openai_embeddings_bge_rerank"
+
+            idx = [i for i in rr.indices if 0 <= i < len(retrieved_chunks)]
+            if idx:
+                retrieved_chunks = [retrieved_chunks[i] for i in idx]
+                # Recompute sources in the same order as reranked chunks when possible.
+                # (We keep unique sources, ordered by appearance.)
+                new_sources: list[str] = []
+                for i in idx:
+                    src = (results[i].metadata or {}).get("source")
+                    if src and str(src) not in new_sources:
+                        new_sources.append(str(src))
+                if new_sources:
+                    sources = new_sources
+        except Exception:
+            # Fall back to embedding-only order.
+            reranker_used = False
+            reranker_provider = None
+            provider = "chroma_openai_embeddings"
+
+        # Final chunks: keep top_n.
+        retrieved_chunks = retrieved_chunks[:rerank_top_n]
+
         return RagResult(
             retrieved_context="\n\n---\n\n".join(retrieved_chunks).strip(),
             sources=sources,
-            top_k=top_k,
-            retrieval_provider="chroma_openai_embeddings",
+            top_k=len(retrieved_chunks),
+            retrieval_provider=provider,
+            recall_top_k=recall_top_k,
+            rerank_top_n=rerank_top_n,
+            reranker_provider=reranker_provider,
+            reranker_used=reranker_used,
         )
     except Exception as e:
         msg = (str(e) or "").strip().replace("\n", " ")
