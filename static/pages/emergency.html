@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Emergency · Medical AI Agent</title>
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body>
+    <div class="shell">
+      <header class="nav" role="banner">
+        <div class="nav__inner">
+          <a href="/" class="nav__brand" data-nav="/">
+            <span class="nav__logo" aria-hidden="true">✚</span>
+            <div class="nav__titles">
+              <p class="nav__title">Medical AI Agent</p>
+              <p class="nav__subtitle">Emergency support</p>
+            </div>
+          </a>
+          <nav class="nav__links" aria-label="Primary">
+            <a href="/" class="nav__link" data-nav="/">Home</a>
+            <a href="/static/pages/consult.html" class="nav__link" data-nav="/static/pages/consult.html">Consultation</a>
+            <a href="/static/pages/departments.html" class="nav__link" data-nav="/static/pages/departments.html">Departments</a>
+            <a href="/static/pages/records.html" class="nav__link" data-nav="/static/pages/records.html">Records</a>
+            <a href="/static/pages/emergency.html" class="nav__link" data-nav="/static/pages/emergency.html">Emergency</a>
+          </nav>
+          <div class="nav__actions">
+            <button type="button" class="btn btn--ghost btn--sm" id="themeToggle">Dark</button>
+            <button type="button" class="nav__mobile-toggle" id="navMobileToggle" aria-label="Open menu" aria-expanded="false">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                <path d="M4 6h16M4 12h16M4 18h16" />
+              </svg>
+            </button>
+          </div>
+        </div>
+        <div class="nav__drawer" id="navDrawer">
+          <a href="/" class="nav__link" data-nav="/">Home</a>
+          <a href="/static/pages/consult.html" class="nav__link" data-nav="/static/pages/consult.html">Consultation</a>
+          <a href="/static/pages/departments.html" class="nav__link" data-nav="/static/pages/departments.html">Departments</a>
+          <a href="/static/pages/records.html" class="nav__link" data-nav="/static/pages/records.html">Records</a>
+          <a href="/static/pages/emergency.html" class="nav__link" data-nav="/static/pages/emergency.html">Emergency</a>
+        </div>
+      </header>
+
+      <main class="main">
+        <div class="emergency-hero">
+          <h1>Emergency support</h1>
+          <p>
+            If you or someone else may be experiencing a medical emergency, <strong>call your local emergency number immediately</strong>.
+            This demo cannot dispatch help.
+          </p>
+        </div>
+
+        <div class="container">
+          <div class="emergency-actions">
+            <a class="btn btn--danger btn--lg btn--block" href="tel:911">Call 911</a>
+            <a
+              class="btn btn--secondary btn--lg btn--block"
+              href="https://www.google.com/maps/search/emergency+room+near+me/"
+              target="_blank"
+              rel="noopener noreferrer"
+              >Nearest ER (maps)</a
+            >
+            <button type="button" class="btn btn--primary btn--lg btn--block" id="chestPainBtn">Chest pain guidance</button>
+            <button type="button" class="btn btn--primary btn--lg btn--block" id="strokeBtn">Stroke warning signs</button>
+          </div>
+
+          <article class="card" style="max-width: 640px; margin: 0 auto 48px">
+            <h2 class="card__title">When to seek emergency care (demo copy)</h2>
+            <p class="card__body">
+              Sudden chest pain with shortness of sweat, sweating, or pain radiating to the arm or jaw; sudden weakness on one side
+              of the body; trouble speaking; severe shortness of breath; loss of consciousness — these patterns often warrant
+              immediate evaluation. This page is for UI demonstration only.
+            </p>
+          </article>
+        </div>
+      </main>
+
+      <footer class="disclaimer-bar" role="contentinfo">
+        This tool does not replace emergency services. Not medical advice. Use local emergency numbers outside the US where applicable.
+      </footer>
+    </div>
+    <script src="/static/app.js" defer></script>
+    <script>
+      (function () {
+        function show(title, body) {
+          window.alert(title + "\n\n" + body);
+        }
+        var chest = document.getElementById("chestPainBtn");
+        var stroke = document.getElementById("strokeBtn");
+        if (chest) {
+          chest.addEventListener("click", function () {
+            show(
+              "Chest pain (demo guidance)",
+              "Chest pressure, pain spreading to arm/jaw, shortness of breath, cold sweat, or fainting can be serious.\n\nIf you might be having a heart attack or severe event, call emergency services now. This app is not a diagnostic tool."
+            );
+          });
+        }
+        if (stroke) {
+          stroke.addEventListener("click", function () {
+            show(
+              "Stroke warning signs (demo)",
+              "Think FAST: Face drooping, Arm weakness, Speech difficulty, Time to call emergency services.\n\nSudden confusion, severe headache, or trouble walking can also be emergencies. Call emergency services if suspected."
+            );
+          });
+        }
+      })();
+    </script>
+  </body>
+</html>

@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Departments · Medical AI Agent</title>
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body>
+    <div class="shell">
+      <header class="nav" role="banner">
+        <div class="nav__inner">
+          <a href="/" class="nav__brand" data-nav="/">
+            <span class="nav__logo" aria-hidden="true">✚</span>
+            <div class="nav__titles">
+              <p class="nav__title">Medical AI Agent</p>
+              <p class="nav__subtitle">Care pathways</p>
+            </div>
+          </a>
+          <nav class="nav__links" aria-label="Primary">
+            <a href="/" class="nav__link" data-nav="/">Home</a>
+            <a href="/static/pages/consult.html" class="nav__link" data-nav="/static/pages/consult.html">Consultation</a>
+            <a href="/static/pages/departments.html" class="nav__link" data-nav="/static/pages/departments.html">Departments</a>
+            <a href="/static/pages/records.html" class="nav__link" data-nav="/static/pages/records.html">Records</a>
+            <a href="/static/pages/emergency.html" class="nav__link" data-nav="/static/pages/emergency.html">Emergency</a>
+          </nav>
+          <div class="nav__actions">
+            <button type="button" class="btn btn--ghost btn--sm" id="themeToggle">Dark</button>
+            <button type="button" class="nav__mobile-toggle" id="navMobileToggle" aria-label="Open menu" aria-expanded="false">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                <path d="M4 6h16M4 12h16M4 18h16" />
+              </svg>
+            </button>
+          </div>
+        </div>
+        <div class="nav__drawer" id="navDrawer">
+          <a href="/" class="nav__link" data-nav="/">Home</a>
+          <a href="/static/pages/consult.html" class="nav__link" data-nav="/static/pages/consult.html">Consultation</a>
+          <a href="/static/pages/departments.html" class="nav__link" data-nav="/static/pages/departments.html">Departments</a>
+          <a href="/static/pages/records.html" class="nav__link" data-nav="/static/pages/records.html">Records</a>
+          <a href="/static/pages/emergency.html" class="nav__link" data-nav="/static/pages/emergency.html">Emergency</a>
+        </div>
+      </header>
+
+      <main class="main">
+        <div class="container">
+          <header class="page-head">
+            <h1>Departments</h1>
+            <p>
+              Explore specialty areas and jump into a guided consultation. Booking buttons are <strong>demo navigation</strong> —
+              they open the consult flow with a routing hint in the URL.
+            </p>
+          </header>
+
+          <div class="grid-depts">
+            <article class="card card--interactive">
+              <h2 class="card__title">Internal Medicine</h2>
+              <p class="card__meta">Primary &amp; complex adult care</p>
+              <p class="card__body">
+                Comprehensive evaluation for chronic disease, preventive care, and undifferentiated symptoms that need a broad
+                diagnostic lens.
+              </p>
+              <a class="btn btn--primary" style="margin-top: 16px" href="/static/pages/consult.html?dept=Internal%20Medicine">Book</a>
+            </article>
+
+            <article class="card card--interactive">
+              <h2 class="card__title">Pediatrics</h2>
+              <p class="card__meta">Infants through adolescents</p>
+              <p class="card__body">
+                Age-appropriate triage support for fever, respiratory symptoms, and parental guidance — always with pediatric
+                escalation paths in a real product.
+              </p>
+              <a class="btn btn--primary" style="margin-top: 16px" href="/static/pages/consult.html?dept=Pediatrics">Book</a>
+            </article>
+
+            <article class="card card--interactive">
+              <h2 class="card__title">Dermatology</h2>
+              <p class="card__meta">Skin, hair, and nails</p>
+              <p class="card__body">
+                Structured intake for rashes, lesions, and medication-related skin reactions; pairs well with photo upload in a
+                production roadmap.
+              </p>
+              <a class="btn btn--primary" style="margin-top: 16px" href="/static/pages/consult.html?dept=Dermatology">Book</a>
+            </article>
+
+            <article class="card card--interactive">
+              <h2 class="card__title">Emergency</h2>
+              <p class="card__meta">High-acuity routing</p>
+              <p class="card__body">
+                When red-flag patterns appear, the assistant should prioritize emergency language and clear escalation — see the
+                dedicated emergency page.
+              </p>
+              <a class="btn btn--danger" style="margin-top: 16px" href="/static/pages/emergency.html">Emergency resources</a>
+            </article>
+
+            <article class="card card--interactive">
+              <h2 class="card__title">Orthopedics</h2>
+              <p class="card__meta">Musculoskeletal injuries</p>
+              <p class="card__body">
+                Sprains, fractures, and post-injury follow-up routing. In a live system this would integrate imaging orders and
+                surgeon availability.
+              </p>
+              <a class="btn btn--primary" style="margin-top: 16px" href="/static/pages/consult.html?dept=Orthopedics">Book</a>
+            </article>
+          </div>
+        </div>
+      </main>
+    </div>
+    <script src="/static/app.js" defer></script>
+  </body>
+</html>

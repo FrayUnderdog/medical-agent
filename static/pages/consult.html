@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Consultation · Medical AI Agent</title>
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body>
+    <div class="shell">
+      <header class="nav" role="banner">
+        <div class="nav__inner">
+          <a href="/" class="nav__brand" data-nav="/">
+            <span class="nav__logo" aria-hidden="true">✚</span>
+            <div class="nav__titles">
+              <p class="nav__title">Medical AI Agent</p>
+              <p class="nav__subtitle">Consultation workspace</p>
+            </div>
+          </a>
+          <nav class="nav__links" aria-label="Primary">
+            <a href="/" class="nav__link" data-nav="/">Home</a>
+            <a href="/static/pages/consult.html" class="nav__link" data-nav="/static/pages/consult.html">Consultation</a>
+            <a href="/static/pages/departments.html" class="nav__link" data-nav="/static/pages/departments.html">Departments</a>
+            <a href="/static/pages/records.html" class="nav__link" data-nav="/static/pages/records.html">Records</a>
+            <a href="/static/pages/emergency.html" class="nav__link" data-nav="/static/pages/emergency.html">Emergency</a>
+          </nav>
+          <div class="nav__actions">
+            <button type="button" class="btn btn--ghost btn--sm" id="themeToggle">Dark</button>
+            <button type="button" class="nav__mobile-toggle" id="navMobileToggle" aria-label="Open menu" aria-expanded="false">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                <path d="M4 6h16M4 12h16M4 18h16" />
+              </svg>
+            </button>
+          </div>
+        </div>
+        <div class="nav__drawer" id="navDrawer">
+          <a href="/" class="nav__link" data-nav="/">Home</a>
+          <a href="/static/pages/consult.html" class="nav__link" data-nav="/static/pages/consult.html">Consultation</a>
+          <a href="/static/pages/departments.html" class="nav__link" data-nav="/static/pages/departments.html">Departments</a>
+          <a href="/static/pages/records.html" class="nav__link" data-nav="/static/pages/records.html">Records</a>
+          <a href="/static/pages/emergency.html" class="nav__link" data-nav="/static/pages/emergency.html">Emergency</a>
+        </div>
+      </header>
+
+      <main class="main">
+        <div class="container container--wide">
+          <header class="page-head">
+            <h1>Consultation</h1>
+            <p>Chat with the assistant. Describe symptoms or tap a quick prompt.</p>
+          </header>
+
+          <div class="consult-layout">
+            <aside class="card patient-card" aria-label="Session summary">
+              <h2 class="card__title" style="font-size: 1rem">Patient summary</h2>
+              <p class="card__meta" id="deptContextLine" style="display: none"></p>
+              <dl>
+                <div>
+                  <dt>Name</dt>
+                  <dd id="sumName">Not provided</dd>
+                </div>
+                <div>
+                  <dt>Age</dt>
+                  <dd id="sumAge">Not provided</dd>
+                </div>
+                <div>
+                  <dt>Symptoms</dt>
+                  <dd id="sumSymptoms">Not provided</dd>
+                </div>
+                <div>
+                  <dt>Duration</dt>
+                  <dd id="sumDuration">Not provided</dd>
+                </div>
+                <div>
+                  <dt>Allergies</dt>
+                  <dd id="sumAllergies">Not provided</dd>
+                </div>
+                <div>
+                  <dt>Conditions</dt>
+                  <dd id="sumConditions">Not provided</dd>
+                </div>
+                <div>
+                  <dt>Risk level</dt>
+                  <dd style="margin-top: 6px">
+                    <span id="sumRisk" class="risk-badge risk-badge--unknown" data-risk="unknown">Unknown</span>
+                  </dd>
+                </div>
+              </dl>
+              <button type="button" class="btn btn--secondary btn--block" id="newSessionBtn" style="margin-top: 16px">
+                New session
+              </button>
+              <p class="muted" style="margin-top: 14px; font-size: 0.75rem; line-height: 1.5">
+                Session summary is generated from this conversation and sent with each request.
+              </p>
+              <p class="muted" style="margin-top: 10px; font-size: 0.75rem">
+                <strong>session:</strong> <span id="sessionIdDisplay">—</span>
+              </p>
+            </aside>
+
+            <section class="card chat-panel" aria-label="Chat">
+              <div class="chat-messages" id="messages" role="log" aria-live="polite" aria-relevant="additions">
+                <div id="welcomeEmpty" class="muted" style="padding: 8px 4px 16px; font-size: 0.875rem; line-height: 1.6">
+                  Chat with the assistant. Describe symptoms or tap a quick prompt. Press <strong>Enter</strong> to send,
+                  <strong>Shift+Enter</strong> for a new line.
+                </div>
+              </div>
+              <div class="chips" aria-label="Quick prompts">
+                <button type="button" class="chip" data-chip="I have had a fever and cough for two days.">Fever</button>
+                <button type="button" class="chip" data-chip="I have a severe headache and sensitivity to light.">Headache</button>
+                <button type="button" class="chip" data-chip="I have a dry cough that is getting worse.">Cough</button>
+                <button type="button" class="chip" data-chip="I have an itchy skin rash on my arms for three days.">Skin Rash</button>
+              </div>
+              <div class="chat-input-row">
+                <label class="sr-only" for="messageInput">Message</label>
+                <textarea id="messageInput" rows="2" placeholder="Type your message…"></textarea>
+                <button type="button" class="btn btn--primary" id="sendBtn">Send</button>
+              </div>
+              <p class="muted" style="padding: 12px 16px 0; margin: 0; font-size: 0.75rem">
+                Not medical advice. If you believe you are having an emergency, use the <a href="/static/pages/emergency.html">Emergency</a> page or call local emergency services.
+              </p>
+            </section>
+          </div>
+        </div>
+      </main>
+    </div>
+    <script src="/static/app.js" defer></script>
+    <script src="/static/consult.js" defer></script>
+    <script>
+      (function () {
+        var params = new URLSearchParams(window.location.search);
+        var dept = params.get("dept");
+        var line = document.getElementById("deptContextLine");
+        if (dept && line) {
+          line.style.display = "block";
+          line.textContent = "Booking context: " + decodeURIComponent(dept.replace(/\+/g, " "));
+        }
+      })();
+    </script>
+  </body>
+</html>
