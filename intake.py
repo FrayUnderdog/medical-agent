@@ -81,6 +81,45 @@ def _merge_list(old: list[str] | None, new: list[str] | None) -> list[str]:
     return _uniq_ci(list(old or []) + list(new or []))
 
 
+_SEVERITY_RANK_SWELL: dict[str | None, int] = {
+    None: 0,
+    "none": 1,
+    "mild": 2,
+    "moderate": 3,
+    "severe": 4,
+}
+_SEVERITY_RANK_BRUISE: dict[str | None, int] = {
+    None: 0,
+    "none": 1,
+    "mild": 2,
+    "moderate": 3,
+    "significant": 4,
+}
+_RISK_RANK = {"unknown": 0, "self_care": 1, "routine": 1, "urgent": 2, "emergency": 3}
+
+
+def _walking_status_label(intake: dict[str, Any]) -> str | None:
+    c = intake.get("can_bear_weight")
+    w = intake.get("walking_painful")
+    if c is True and w is True:
+        return "can walk but painful"
+    if c is False:
+        return "cannot bear weight / unable to walk"
+    if c is True and w is not True:
+        return "able to walk with tolerable pain"
+    return None
+
+
+def _merge_severity(
+    key: str, old: str | None, new: str | None, rank_map: dict[str | None, int]
+) -> str | None:
+    if new is None:
+        return old
+    if old is None:
+        return new
+    return new if rank_map.get(new, 0) > rank_map.get(old, 0) else old
+
+
 def _parse_name(text: str) -> str | None:
     t = text.strip()
     m = re.search(r"\bmy\s+name\s+is\s+([A-Za-z][A-Za-z'\-]{0,39})\b", t, re.I)
@@ -334,6 +373,295 @@ def _risk_level_hint(text: str, red: list[str], symptoms: list[str]) -> str:
     return "routine"
 
 
+def _is_ankle_intake(merged: dict[str, Any]) -> bool:
+    if merged.get("body_part") == "ankle":
+        return True
+    sl = " ".join(merged.get("symptoms") or []).lower()
+    return "ankle injury" in sl or "ankle" in sl
+
+
+def _parse_multiturn_clinical(message: str, existing: dict[str, Any]) -> dict[str, Any]:
+    """
+    Extract follow-up fields (EN/CN) for musculoskeletal and progression reporting.
+    """
+    text = _norm_str(message)
+    if not text:
+        return {}
+    low = text.lower()
+    tcn = text  # keep original for CJK
+
+    out: dict[str, Any] = {}
+    red_add: list[str] = []
+
+    # —— Chinese: severity / course ——
+    if re.search(
+        r"肿胀(很|得)?严重|肿得(很)?严重|严重肿胀|脚踝.*肿胀(很|得)?(严重|厉害)", tcn
+    ) or re.search(
+        r"肿(得)?很厉害", tcn
+    ):
+        out["swelling"] = "severe"
+    if re.search(r"淤青(很)?多|大面积淤青|很多淤青|大片淤青", tcn) or re.search(
+        r"青紫(很)?多", tcn
+    ):
+        out["bruising"] = "significant"
+    if re.search(
+        r"比(受伤|当时|开始)(时)?(更疼|更痛)|更疼了|越来越疼|越来越痛|比.*更疼|恶化",
+        tcn,
+    ) or re.search(
+        r"getting worse|worse than before|more painful than (before|when)",
+        low,
+    ):
+        out["worsening_pain"] = True
+    if re.search(r"能走但疼|能走路但(疼|痛)|可以走几步(但|，)(是)?(很)?疼|走几步(很)?疼", tcn) or re.search(
+        r"能走.*(疼|痛)", tcn
+    ):
+        out["can_bear_weight"] = True
+        out["walking_painful"] = True
+    if re.search(r"不能走|走不了|无法行走|不能承重|不能著力", tcn) or re.search(
+        r"走不动", tcn
+    ):
+        out["can_bear_weight"] = False
+        if "unable_to_bear_weight" not in (existing.get("red_flags") or []):
+            red_add.append("unable_to_bear_weight")
+
+    # —— English: weight-bearing, walking, worsening, bruise/swelling ——
+    if re.search(
+        r"\b(yeah|yes),?\s*but\s+it['']?s\s+painful\b|\bbut\s+it['']?s\s+painful\b",
+        low,
+    ) or re.search(
+        r"\bcan (walk|walk on it|put weight) but (it['']?s )?(painful|hurts?)\b",
+        low,
+    ) or re.search(r"\bwalk(ing)? (is )?painful\b|\bpainful to walk\b", low):
+        if "can't walk" not in low and "cannot walk" not in low:
+            out["can_bear_weight"] = True
+        out["walking_painful"] = True
+    if re.search(
+        r"\bcan'?t (walk|stand|bear weight|put weight)\b|"
+        r"\bcannot (walk|stand|bear weight|put weight)\b|"
+        r"\bunable to (walk|stand|bear weight)\b|"
+        r"don'?t (think )?i can (walk|put weight)",
+        low,
+    ):
+        out["can_bear_weight"] = False
+        if "unable_to_bear_weight" not in (existing.get("red_flags") or []):
+            red_add.append("unable_to_bear_weight")
+
+    if re.search(
+        r"\b(severe|very|a lot of) (ankle )?swelling|swelling (is )?(severe|very bad)\b|"
+        r"\bvery swollen\b|\bso swollen\b|badly swollen",
+        low,
+    ) or re.search(
+        r"肿胀(的)?(很)?(严重|厉害)|肿(得)?(很)?(严重|厉害)|严重肿胀|肿胀(很)?重", tcn
+    ):
+        out["swelling"] = "severe"
+    if re.search(
+        r"\b(a lot of|a lot|significant|heavy|dark) (of )?bruis(e|ing)\b|"
+        r"\bbruise(s)? around my ankle\b|"
+        r"\bsee a lot of bruise\b|"
+        r"\bconsiderable bruising\b",
+        low,
+    ) or re.search(
+        r"青紫(很)?(多|重)|很(大)?片(淤)?青|大面积淤青|明显淤青|淤青明显", tcn
+    ):
+        out["bruising"] = "significant"
+    if re.search(
+        r"\b(more painful than|worse than (when|before)|getting worse|worsening|"
+        r"pain is worse)\b",
+        low,
+    ) or re.search(
+        r"更疼|更痛|比.*疼|加重|恶化|越来越(疼|痛)", tcn
+    ):
+        out["worsening_pain"] = True
+
+    # Deformity / neuro (ankle) — English + simple CN
+    if re.search(
+        r"\b(deform|bent the wrong|bones out of place|snapped)\b|"
+        r"畸形|明显变形|肿成奇怪的形状|骨头凸出来",
+        low + tcn,
+    ):
+        red_add.append("possible_deformity")
+    if re.search(
+        r"\b(numb(ness)?|cold toes?|toes? (are )?numb|blue toes?)\b|"
+        r"脚(趾)?(发)?麻|脚(趾)?(冰)?冷|脚趾发紫",
+        low + tcn,
+    ):
+        red_add.append("numb_or_cold_toes")
+    if re.search(
+        r"\brapidly worsening|pain suddenly much worse|can'?t tolerate the pain\b", low
+    ):
+        red_add.append("rapid_worsening_severe_pain")
+
+    dash = r"[\-–\u2013\u2014]"
+    m_p = re.search(
+        r"(?:roughly|how strong|pain|from)\s+[^?\n]{0,40}?1\s*" + dash + r"\s*10\s*\??\s*[:：]?\s*(\d{1,2})",
+        text,
+        re.I,
+    ) or re.search(
+        r"1\s*" + dash + r"\s*10\s*\??\s*(\d{1,2})\s*\.?(?:\s*$|\Z)",
+        text,
+        re.I,
+    ) or re.search(
+        r"10\s*\?\s*(\d{1,2})\s*\.?(?:\s*$|\Z)",
+        text,
+        re.I,
+    ) or re.search(
+        r"(?:1\s*" + dash + r"\s*10|评分)\s*[^\d]{0,6}(\d{1,2})",
+        tcn,
+    )
+    if m_p:
+        n = int(m_p.group(1))
+        if 0 <= n <= 10:
+            out["pain_score"] = n
+    m2 = re.search(r"\bpain(?:\s*level)?\s*(?:is|[:=])?\s*(\d{1,2})(?:\s*/\s*10)?\b", low) or re.search(
+        r"疼痛(?:评分|是)?[：:\s]*(\d{1,2})",
+        tcn,
+    )
+    if m2:
+        n = int(m2.group(1))
+        if 0 <= n <= 10:
+            out["pain_score"] = n
+    _cn_num = {
+        "一": 1,
+        "二": 2,
+        "三": 3,
+        "四": 4,
+        "五": 5,
+        "六": 6,
+        "七": 7,
+        "八": 8,
+        "九": 9,
+        "十": 10,
+    }
+    m3 = re.search(r"疼痛[：:\s]*(\d{1,2})\s*分?", tcn)
+    if m3:
+        n = int(m3.group(1))
+        if 0 <= n <= 10:
+            out["pain_score"] = n
+    m4 = re.search(r"([一二三四五六七八九十])分", tcn)
+    if m4 and m4.group(1) in _cn_num:
+        out["pain_score"] = _cn_num[m4.group(1)]
+
+    st = text.strip()
+    if len(st) <= 4 and re.fullmatch(r"[\d\s/\.]+", st) and _is_ankle_intake(existing):
+        m5 = re.search(r"(\d{1,2})", st)
+        if m5:
+            n = int(m5.group(1))
+            if 0 <= n <= 10:
+                out["pain_score"] = n
+
+    af: list[str] = []
+    if re.search(
+        r"(?:take a few steps|walk on it|can you (walk| stand))",
+        low,
+    ) and (
+        re.search(r"yeah|yes|i can|but|painful|hurts|walk a few", low)
+        or re.search(
+            r"能走|可以走|能站|走几步|承重", tcn
+        )
+    ):
+        af.append("walking")
+    if re.search(
+        r"swell|bruis|青紫|淤青|肿胀", low + tcn, re.I
+    ) and (
+        re.search(
+            r"a lot|severe|very|see|很多|明显|严重|大量", low + tcn, re.I
+        )
+    ):
+        af.append("swelling_or_bruising")
+    if out.get("pain_score") is not None or re.search(
+        r"1[-–\s]10|/10|pain (level|score|is)|\bpain\b.*\d", low
+    ) or re.search(
+        r"疼.*\d|痛.*\d|评分", tcn
+    ):
+        if out.get("pain_score") is not None:
+            af.append("pain_score")
+
+    if af:
+        out["answered_followups"] = _uniq_ci(af)
+
+    if red_add:
+        out["red_flags"] = _uniq_ci(red_add)
+    return out
+
+
+def _ankle_risk_from_state(merged: dict[str, Any]) -> str | None:
+    if not _is_ankle_intake(merged):
+        return None
+    rf = " ".join(merged.get("red_flags") or []).lower()
+    rflags = [str(x).lower() for x in (merged.get("red_flags") or [])]
+    dlm = (merged.get("duration") or "").lower()
+    days_2_plus = "2" in dlm and "day" in dlm
+    s = (merged.get("swelling") or "").lower()
+    b = (merged.get("bruising") or "").lower()
+    ps = merged.get("pain_score")
+    wp = merged.get("worsening_pain")
+    cando = merged.get("can_bear_weight")
+    wpain = merged.get("walking_painful")
+
+    if cando is False or "unable_to_bear_weight" in rflags:
+        return "emergency"
+    if "possible_deformity" in rflags or "deform" in rf:
+        return "emergency"
+    if "numb_or_cold_toes" in rflags or "rapid_worsening_severe_pain" in rflags:
+        return "emergency"
+
+    urgent = False
+    if s == "severe" or b == "significant":
+        urgent = True
+    if wp is True:
+        urgent = True
+    if wpain is True and ps is not None and int(ps) >= 6:
+        urgent = True
+    if days_2_plus and wp is True:
+        urgent = True
+    if _SEVERITY_RANK_SWELL.get(s, 0) >= 3 and (wp is True or wpain is True):
+        urgent = True
+
+    if urgent:
+        return "urgent"
+
+    if cando is True and s in (None, "none", "mild") and b in (None, "none", "mild") and not wp and (ps is None or int(ps) < 5):
+        return "routine"
+    if merged.get("mechanism") == "twisting injury" and merged.get("duration"):
+        return "routine"
+    return "routine"
+
+
+def _merge_risk(a: str | None, b: str | None) -> str:
+    ra = (a or "routine").lower()
+    rb = (b or "routine").lower()
+    if _RISK_RANK.get(rb, 0) > _RISK_RANK.get(ra, 0):
+        return rb
+    return ra
+
+
+def _apply_clinical_overlays(merged: dict[str, Any], clin: dict[str, Any]) -> dict[str, Any]:
+    if not clin:
+        return merged
+    for k in ("can_bear_weight", "walking_painful"):
+        if k in clin and clin[k] is not None:
+            merged[k] = bool(clin[k])
+    if clin.get("worsening_pain") is True or merged.get("worsening_pain") is True:
+        merged["worsening_pain"] = True
+    for fld, rmap in (
+        ("swelling", _SEVERITY_RANK_SWELL),
+        ("bruising", _SEVERITY_RANK_BRUISE),
+    ):
+        if fld in clin and clin[fld] is not None:
+            merged[fld] = _merge_severity(
+                fld, merged.get(fld), str(clin[fld]), rmap
+            )
+    if clin.get("pain_score") is not None:
+        merged["pain_score"] = int(clin["pain_score"])
+    if clin.get("red_flags"):
+        merged["red_flags"] = _merge_list(merged.get("red_flags"), clin["red_flags"])
+    if clin.get("answered_followups"):
+        merged["answered_followups"] = _merge_list(
+            merged.get("answered_followups", []), clin["answered_followups"]
+        )
+    return merged
+
+
 def _confidence(merged: dict[str, Any]) -> float:
     keys = [
         "name",
@@ -372,6 +700,13 @@ def _empty_intake() -> dict[str, Any]:
         "likely_department": None,
         "risk_level_hint": "routine",
         "food_trigger": None,
+        "can_bear_weight": None,
+        "walking_painful": None,
+        "swelling": None,
+        "bruising": None,
+        "pain_score": None,
+        "worsening_pain": None,
+        "answered_followups": [],
         "confidence": 0.0,
     }
 
@@ -435,6 +770,8 @@ def _merge_intake(existing: dict[str, Any] | None, parsed: dict[str, Any]) -> di
         "likely_department",
         "risk_level_hint",
         "food_trigger",
+        "can_bear_weight",
+        "walking_painful",
     ):
         base[key] = _merge_scalar(base.get(key), parsed.get(key))
     # lists
@@ -462,6 +799,13 @@ def extract_patient_intake(message: str, existing_state: dict | None = None) -> 
     """
     parsed = _parse_message_only(message)
     merged = _merge_intake(existing_state, parsed)
+    clin = _parse_multiturn_clinical(message, merged)
+    merged = _apply_clinical_overlays(merged, clin)
+    ar = _ankle_risk_from_state(merged)
+    if ar:
+        merged["risk_level_hint"] = _merge_risk(merged.get("risk_level_hint"), ar)
+    if _is_ankle_intake(merged) and (merged.get("risk_level_hint") or "").lower() == "urgent":
+        merged["likely_department"] = "Orthopedics / Urgent Care"
     merged["confidence"] = _confidence(merged)
     return merged
 
@@ -481,6 +825,8 @@ def build_patient_summary_for_response(
         risk = "urgent"
     elif (intake.get("risk_level_hint") or "").lower() == "emergency":
         risk = "emergency"
+    elif (intake.get("risk_level_hint") or "").lower() == "urgent":
+        risk = "urgent"
     elif triage_level == "emergency":
         risk = "emergency"
     elif triage_level == "urgent":
@@ -492,6 +838,10 @@ def build_patient_summary_for_response(
 
     loc_parts = [p for p in (intake.get("side_or_location"), intake.get("body_part")) if p]
     body_loc = " ".join(loc_parts) if loc_parts else None
+
+    pain_display = None
+    if intake.get("pain_score") is not None:
+        pain_display = f"{int(intake['pain_score'])}/10"
 
     return {
         "name": intake.get("name"),
@@ -507,4 +857,10 @@ def build_patient_summary_for_response(
         "likely_department": intake.get("likely_department"),
         "risk_level": risk,
         "body_location_label": body_loc,
+        "swelling": intake.get("swelling"),
+        "bruising": intake.get("bruising"),
+        "pain_score": intake.get("pain_score"),
+        "pain_display": pain_display,
+        "walking_status": _walking_status_label(intake),
+        "worsening_pain": intake.get("worsening_pain"),
     }

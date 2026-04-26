@@ -72,6 +72,68 @@ def main() -> int:
     else:
         print("PASS anxiety insomnia")
 
+    # —— Multi-turn Ray ankle: CN + EN follow-ups ——
+    session_state: dict = {}
+    m1 = "I'm Ray, I twisted my left ankle two days ago."
+    m2 = "现在脚踝肿胀的很严重，比受伤时更疼了。"
+    m3 = (
+        "1) Can you take a few steps on it? Yeah, but it's painful. "
+        "2) How much swelling or bruising do you see? I can see a lot bruise around my ankle "
+        "3) Roughly how strong is the pain from 1–10? 6"
+    )
+    out1 = extract_patient_intake(m1, session_state)
+    # single-turn follow-up answers (do not require swelling to be present)
+    out_follow = extract_patient_intake(m3, out1)
+    if (out_follow.get("bruising") or "").lower() != "significant":
+        print(f"FAIL ray followup bruising: {out_follow.get('bruising')!r}")
+        failed += 1
+    out2 = extract_patient_intake(m2, out1)
+    out3 = extract_patient_intake(m3, out2)
+    if out3.get("name") != "Ray":
+        print(f"FAIL ray3 name: {out3.get('name')!r}")
+        failed += 1
+    if out3.get("body_part") != "ankle":
+        print(f"FAIL ray3 body_part: {out3.get('body_part')!r}")
+        failed += 1
+    if out3.get("side_or_location") != "left":
+        print(f"FAIL ray3 side: {out3.get('side_or_location')!r}")
+        failed += 1
+    dur3 = (out3.get("duration") or "").lower()
+    if "2" not in dur3 or "day" not in dur3:
+        print(f"FAIL ray3 duration: {out3.get('duration')!r}")
+        failed += 1
+    if (out3.get("swelling") or "").lower() != "severe":
+        print(f"FAIL ray3 swelling: {out3.get('swelling')!r}")
+        failed += 1
+    if (out3.get("bruising") or "").lower() != "significant":
+        print(f"FAIL ray3 bruising: {out3.get('bruising')!r}")
+        failed += 1
+    if out3.get("walking_painful") is not True:
+        print(f"FAIL ray3 walking_painful: {out3.get('walking_painful')!r}")
+        failed += 1
+    if out3.get("can_bear_weight") is not True:
+        print(f"FAIL ray3 can_bear_weight: {out3.get('can_bear_weight')!r}")
+        failed += 1
+    if out3.get("pain_score") != 6:
+        print(f"FAIL ray3 pain_score: {out3.get('pain_score')!r}")
+        failed += 1
+    if out3.get("worsening_pain") is not True:
+        print(f"FAIL ray3 worsening: {out3.get('worsening_pain')!r}")
+        failed += 1
+    if (out3.get("risk_level_hint") or "").lower() != "urgent":
+        print(f"FAIL ray3 risk: {out3.get('risk_level_hint')!r}")
+        failed += 1
+    af_raw = out3.get("answered_followups") or []
+    for key in ("walking", "swelling_or_bruising", "pain_score"):
+        if not any((str(x) or "").lower() == key for x in af_raw):
+            print(f"FAIL ray3 answered_followups missing {key!r}: {out3.get('answered_followups')!r}")
+            failed += 1
+    if out3.get("likely_department") != "Orthopedics / Urgent Care":
+        print(f"FAIL ray3 dept: {out3.get('likely_department')!r}")
+        failed += 1
+    else:
+        print("PASS ray multirun ankle")
+
     print("---")
     print(f"failed={failed}")
     return 1 if failed else 0

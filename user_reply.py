@@ -8,7 +8,6 @@ from typing import Any
 
 from guardrails import GuardrailResult
 
-
 _DISCLAIMER = (
     "This is general information only—not a diagnosis or personal medical advice. "
     "If you are unsure or feel worse, contact a qualified clinician or local emergency services."
@@ -43,6 +42,122 @@ def _hint_category(retrieval_hint: str, intake: dict[str, Any]) -> str:
     return "generic"
 
 
+def _ankle_followup_incomplete(intake: dict[str, Any]) -> list[str]:
+    need: list[str] = []
+    if intake.get("can_bear_weight") is None:
+        need.append("walking")
+    if intake.get("swelling") is None and intake.get("bruising") is None:
+        need.append("swelling_or_bruising")
+    if intake.get("pain_score") is None:
+        need.append("pain_score")
+    return need
+
+
+def _ankle_should_escalate(intake: dict[str, Any]) -> bool:
+    r = (intake.get("risk_level_hint") or "").lower()
+    if r in ("urgent", "emergency"):
+        return True
+    s = (intake.get("swelling") or "").lower()
+    b = (intake.get("bruising") or "").lower()
+    if s == "severe" or b == "significant":
+        return True
+    if intake.get("worsening_pain") is True:
+        return True
+    ps, wp = intake.get("pain_score"), intake.get("walking_painful")
+    if ps is not None and int(ps) >= 6 and wp is True:
+        return True
+    return False
+
+
+def _ankle_urgent_prose(intake: dict[str, Any]) -> str:
+    g = _greet(intake)
+    bits: list[str] = []
+    if (intake.get("swelling") or "").lower() == "severe" or (intake.get("bruising") or "").lower() == "significant":
+        bits.append("significant visible swelling or bruising")
+    if intake.get("worsening_pain") is True:
+        bits.append("worsening pain since the injury")
+    if intake.get("walking_painful") is True and intake.get("can_bear_weight") is True:
+        bits.append("pain with walking or weight bearing")
+    ps = intake.get("pain_score")
+    if ps is not None and int(ps) >= 6:
+        bits.append(f"moderate-to-higher self-rated pain (around {int(ps)}/10)")
+
+    why = (
+        (", and ".join(bits) if bits else "the combination of pain, swelling, and function you described")
+    )
+
+    return (
+        f"{g}thanks for the details. Because your ankle is {why}, it would be safer to get it checked the same day "
+        "by a clinician or urgent care—partly to consider whether imaging may be needed, such as to **rule out a fracture** "
+        "or a more serious **ligament injury** (I can’t tell from chat).\n\n"
+        "Until you’re seen, avoid “pushing through” sharp pain. Rest the ankle, keep it **elevated** when you can, "
+        "and use **ice** wrapped in a cloth for 15–20 minutes at a time, with breaks. You can use a light **compression** "
+        "wrap as long as it does **not** increase pain, tingling, numbness, or color change in the toes.\n\n"
+        "**Go to emergency care now** if you **cannot bear weight** or the ankle looks **deformed**, the toes are **numb, "
+        "very cold, or blue**, or the pain and swelling are **escalating quickly**.\n\n"
+        "If you have access, a visit for **orthopaedics/urgent care** can be a reasonable same-day next step. "
+        "Would you like help with finding **urgent care** or **orthopaedics** options in your area (demo: not booked here)?\n\n"
+        f"{_DISCLAIMER}"
+    )
+
+
+def _ankle_missing_questions(need: list[str]) -> str:
+    kmap = {
+        "walking": "1) Can you take a few steps on it (even if it hurts)?",
+        "swelling_or_bruising": "2) How much swelling and bruising do you see? (Even a little counts.)",
+        "pain_score": "3) Roughly how strong is the pain from 1 to 10?",
+    }
+    lines: list[str] = []
+    for key in need:
+        if key in kmap and kmap[key] not in lines:
+            lines.append(kmap[key])
+    return "\n".join(lines) if lines else "Could you share a bit more about weight-bearing, visible swelling/bruising, and pain level?"
+
+
+def _ankle_first_visit_template(intake: dict[str, Any], loc: str) -> str:
+    g = _greet(intake)
+    need = _ankle_followup_incomplete(intake)
+    dur = intake.get("duration") or "the past couple of days"
+    return (
+        f"{g}a twisted {loc or 'ankle'} for {dur} often fits a sprain-type injury. "
+        "I can’t tell you for certain what happened without an exam.\n\n"
+        "Many people are advised to try relative rest, ice, comfortable compression, and elevation early on, "
+        "and to increase gentle movement as pain allows.\n\n"
+        "Please seek urgent care now if you cannot bear weight, notice major deformity, numb/cold toes, "
+        "severe swelling, or pain that is rapidly worsening.\n\n"
+        "To guide next steps, could you share:\n"
+        f"{_ankle_missing_questions(need)}\n\n"
+        f"{_DISCLAIMER}"
+    )
+
+
+def _ankle_followup_ask_template(intake: dict[str, Any], loc: str) -> str:
+    g = _greet(intake)
+    need = _ankle_followup_incomplete(intake)
+    return (
+        f"{g}thanks for the update. To help fine-tune what to do next, could you share:\n\n"
+        f"{_ankle_missing_questions(need)}\n\n"
+        f"{_DISCLAIMER}"
+    )
+
+
+def _ankle_has_multiturn_clinical_context(intake: dict[str, Any]) -> bool:
+    """True once the user has added information beyond a first-visit chief complaint (follow-up turns)."""
+    if intake.get("answered_followups"):
+        return True
+    if intake.get("worsening_pain") is True:
+        return True
+    s = (intake.get("swelling") or "").lower()
+    b = (intake.get("bruising") or "").lower()
+    if s in ("mild", "moderate", "severe") or b in ("mild", "moderate", "significant"):
+        return True
+    if intake.get("can_bear_weight") is not None or intake.get("walking_painful") is not None:
+        return True
+    if intake.get("pain_score") is not None:
+        return True
+    return False
+
+
 def format_user_facing_answer(
     *,
     user_message: str,
@@ -61,6 +176,8 @@ def format_user_facing_answer(
         p for p in (intake.get("side_or_location"), intake.get("body_part")) if p
     ).strip()
 
+    is_ankle = cat == "ankle" or (intake.get("body_part") == "ankle" and intake.get("mechanism") == "twisting injury")
+
     if guardrail.triggered and guardrail.severity == "urgent":
         return (
             f"{g}some of what you described can be serious. "
@@ -69,19 +186,17 @@ def format_user_facing_answer(
             f"{_DISCLAIMER}"
         )
 
-    if cat == "ankle" or (intake.get("body_part") == "ankle" and intake.get("mechanism") == "twisting injury"):
-        dur = intake.get("duration") or "the past couple of days"
+    if is_ankle:
+        if _ankle_should_escalate(intake):
+            return _ankle_urgent_prose(intake)
+        need = _ankle_followup_incomplete(intake)
+        if need:
+            if _ankle_has_multiturn_clinical_context(intake):
+                return _ankle_followup_ask_template(intake, loc)
+            return _ankle_first_visit_template(intake, loc)
         return (
-            f"{g}a twisted {loc or 'ankle'} for {dur} often fits a sprain-type injury. "
-            "I can’t tell you for certain what happened without an exam.\n\n"
-            "Many people are advised to try relative rest, ice, comfortable compression, and elevation early on, "
-            "and to increase gentle movement as pain allows.\n\n"
-            "Please seek urgent care now if you cannot bear weight, notice major deformity, numb/cold toes, "
-            "severe swelling, or pain that is rapidly worsening.\n\n"
-            "To guide next steps, could you share:\n"
-            "1) Can you take a few steps on it?\n"
-            "2) How much swelling or bruising do you see?\n"
-            "3) Roughly how strong is the pain from 1–10?\n\n"
+            f"{g}thanks — I’ve noted you can bear weight, what you see with swelling/bruising, and your pain level. "
+            "Keep an eye on red-flag symptoms from earlier; if new numbness, severe pain, or rapid swelling develops, seek care.\n\n"
             f"{_DISCLAIMER}"
         )
 
@@ -99,7 +214,8 @@ def format_user_facing_answer(
         )
 
     if cat in {"chest", "sob"} or (
-        "chest pain" in (intake.get("symptoms") or []) and "shortness of breath" in (intake.get("symptoms") or [])
+        "chest pain" in (intake.get("symptoms") or [])
+        and "shortness of breath" in (intake.get("symptoms") or [])
     ):
         return (
             f"{g}chest discomfort with breathing symptoms needs a cautious approach.\n\n"
@@ -163,6 +279,9 @@ def intake_brief_for_model(intake: dict[str, Any]) -> str:
     loc = " ".join(p for p in (intake.get("side_or_location"), intake.get("body_part")) if p).strip()
     if loc:
         parts.append(f"location={loc}")
+    for k in ("swelling", "bruising", "pain_score", "can_bear_weight", "walking_painful", "worsening_pain"):
+        if k in intake and intake[k] is not None:
+            parts.append(f"{k}={intake[k]}")
     rf = intake.get("red_flags") or []
     if rf:
         parts.append("red_flags=" + ", ".join(str(r) for r in rf[:8]))

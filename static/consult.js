@@ -25,6 +25,11 @@
       symptoms: [],
       duration: null,
       bodyLoc: null,
+      swelling: null,
+      bruising: null,
+      painDisplay: null,
+      walking: null,
+      worsening: null,
       department: null,
       allergies: [],
       conditions: [],
@@ -341,6 +346,16 @@
 
     setText("sumDuration", summaryState.duration, "Not provided");
     setText("sumBodyLoc", summaryState.bodyLoc, "Not provided");
+    setText("sumSwelling", summaryState.swelling, "Not provided");
+    setText("sumBruise", summaryState.bruising, "Not provided");
+    setText("sumPain", summaryState.painDisplay, "Not provided");
+    setText("sumWalking", summaryState.walking, "Not provided");
+    var wor = summaryState.worsening;
+    setText(
+      "sumWorse",
+      wor === true ? "Yes" : wor === false ? "No" : wor != null ? String(wor) : null,
+      "Not provided"
+    );
 
     var alg = summaryState.allergies && summaryState.allergies.length ? summaryState.allergies.join(", ") : null;
     setText("sumAllergies", alg, "Not provided");
@@ -374,6 +389,11 @@
       symptoms: Array.isArray(ps.symptoms) ? ps.symptoms : [],
       duration: ps.duration || null,
       bodyLoc: bodyLoc,
+      swelling: ps.swelling || null,
+      bruising: ps.bruising || null,
+      painDisplay: ps.pain_display || (ps.pain_score != null ? String(ps.pain_score) + "/10" : null),
+      walking: ps.walking_status || null,
+      worsening: typeof ps.worsening_pain === "boolean" ? ps.worsening_pain : null,
       department: ps.likely_department || null,
       allergies: Array.isArray(ps.allergies) ? ps.allergies : [],
       conditions: Array.isArray(ps.chronic_conditions) ? ps.chronic_conditions : [],
