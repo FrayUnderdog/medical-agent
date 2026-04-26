@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from guardrails import GuardrailResult
+from intake import build_patient_summary_for_response, extract_patient_intake
 from model import MockModelClient, ModelClient, OpenAIModelClient
 from sessions import Session, SessionStore
 from tools import (
@@ -13,6 +14,7 @@ from tools import (
     symptom_extraction,
     triage_suggestion,
 )
+from user_reply import format_user_facing_answer, intake_brief_for_model, retrieval_hint_from_sources
 
 
 @dataclass
@@ -23,6 +25,7 @@ class OrchestratorResult:
     retrieval_provider: str | None
     tool_trace: list[dict[str, Any]]
     tool_outputs: dict
+    patient_summary: dict[str, Any]
 
 
 def _model_provider(model: ModelClient) -> str:
@@ -52,14 +55,29 @@ class Orchestrator:
         self._model = model
 
     def run(self, *, session: Session, user_message: str, guardrail: GuardrailResult) -> OrchestratorResult:
-        # Always store user message.
+        merged_intake = extract_patient_intake(user_message, session.patient_intake or None)
+        session.patient_intake = merged_intake
+
         session.history.append({"role": "user", "content": user_message})
 
         if guardrail.triggered and guardrail.severity == "emergency":
             session.history.append({"role": "assistant", "content": guardrail.safe_reply})
             self._store.touch(session)
             reason = (guardrail.reason or "emergency pattern")[:200]
-            trace = [_trace("guardrails", status="triggered", summary=reason)]
+            trace = [
+                _trace(
+                    "patient_intake",
+                    status="ok",
+                    summary=f"name={merged_intake.get('name')}, cc={merged_intake.get('chief_complaint')}"[:220],
+                ),
+                _trace("guardrails", status="triggered", summary=reason),
+            ]
+            ps = build_patient_summary_for_response(
+                merged_intake,
+                guardrail_triggered=True,
+                guardrail_severity=guardrail.severity,
+                triage_level="emergency",
+            )
             return OrchestratorResult(
                 reply=guardrail.safe_reply or "Emergency safety message.",
                 guardrail_triggered=True,
@@ -73,11 +91,18 @@ class Orchestrator:
                         "matched_rule_ids": guardrail.matched_rule_ids,
                         "matched_phrases": guardrail.matched_phrases,
                         "reason": guardrail.reason,
-                    }
+                    },
+                    "patient_intake": merged_intake,
                 },
+                patient_summary=ps,
             )
 
         trace: list[dict[str, Any]] = [
+            _trace(
+                "patient_intake",
+                status="ok",
+                summary=f"name={merged_intake.get('name')}, cc={merged_intake.get('chief_complaint')}"[:220],
+            ),
             _trace(
                 "guardrails",
                 status="flagged" if guardrail.triggered else "ok",
@@ -146,23 +171,34 @@ class Orchestrator:
             )
         )
 
-        # Update session state.
         session.last_extracted_symptoms = list(symptoms)
         session.last_triage_level = triage_level
+
+        retrieval_hint = retrieval_hint_from_sources(ksrc)
 
         context = {
             "symptoms": symptoms,
             "triage_level": triage_level,
-            "retrieved_context": knowledge.output.get("retrieved_context", ""),
-            "sources": knowledge.output.get("sources", []),
+            "retrieved_context": "",
+            "sources": [],
             "handoff_recommended": handoff.output.get("recommended", False),
+            "intake_brief": intake_brief_for_model(session.patient_intake),
         }
-        reply = self._model.generate(user_message=user_message, context=context)
+        _ = self._model.generate(user_message=user_message, context=context)
+
+        reply = format_user_facing_answer(
+            user_message=user_message,
+            intake=session.patient_intake,
+            triage_level=triage_level,
+            guardrail=guardrail,
+            retrieval_hint=retrieval_hint,
+            handoff_recommended=bool(handoff.output.get("recommended", False)),
+        )
         trace.append(
             _trace(
                 "model",
                 status="ok",
-                summary=f"reply_chars={len(reply)}",
+                summary=f"reply_chars={len(reply)} (user-facing template)",
                 provider=_model_provider(self._model),
             )
         )
@@ -170,7 +206,15 @@ class Orchestrator:
         session.history.append({"role": "assistant", "content": reply})
         self._store.touch(session)
 
+        patient_summary = build_patient_summary_for_response(
+            session.patient_intake,
+            guardrail_triggered=bool(guardrail.triggered),
+            guardrail_severity=guardrail.severity,
+            triage_level=triage_level,
+        )
+
         tool_outputs = {
+            "patient_intake": session.patient_intake,
             extracted.name: extracted.output,
             triage.name: {"triage_level": triage_level},
             med_safety.name: med_safety.output,
@@ -185,7 +229,6 @@ class Orchestrator:
             },
         }
 
-        # Output consistency validation (minimal, deterministic).
         reply_l = reply.lower()
         implies_emergency = any(
             p in reply_l
@@ -199,6 +242,12 @@ class Orchestrator:
         if implies_emergency and triage_level in {"routine", "self_care"}:
             triage_level = "emergency"
             tool_outputs[triage.name] = {"triage_level": triage_level}
+            patient_summary = build_patient_summary_for_response(
+                session.patient_intake,
+                guardrail_triggered=bool(guardrail.triggered),
+                guardrail_severity=guardrail.severity,
+                triage_level=triage_level,
+            )
 
         if triage_level in {"urgent", "emergency"} and not handoff.output.get("recommended"):
             tool_outputs[handoff.name]["recommended"] = True
@@ -211,5 +260,5 @@ class Orchestrator:
             retrieval_provider=knowledge.output.get("retrieval_provider"),
             tool_trace=trace,
             tool_outputs=tool_outputs,
+            patient_summary=patient_summary,
         )
-

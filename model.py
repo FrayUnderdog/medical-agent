@@ -63,8 +63,9 @@ class OpenAIModelClient:
         system = (
             "You are a careful medical triage assistant for a demo app. "
             "You are not a doctor. Do not provide diagnoses. "
-            "Use the provided structured context (symptoms/triage/facts/handoff) to write a short, "
-            "helpful next-steps reply with a safety disclaimer and a few follow-up questions."
+            "Use the provided structured context (symptoms/triage/intake_brief/handoff) to write a short, "
+            "helpful next-steps reply with a safety disclaimer and a few follow-up questions. "
+            "Do not invent file paths or quoted retrieval excerpts."
         )
 
         user = (

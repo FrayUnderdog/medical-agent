@@ -704,6 +704,16 @@ html.theme-dark .risk-badge--monitor {
   color: #fbbf24;
 }
 
+.risk-badge--urgent {
+  background: color-mix(in srgb, #ea580c 16%, var(--surface));
+  color: #c2410c;
+  border-color: color-mix(in srgb, #ea580c 40%, var(--border));
+}
+
+html.theme-dark .risk-badge--urgent {
+  color: #fdba74;
+}
+
 .risk-badge--emergency {
   background: var(--danger-soft);
   color: var(--danger);

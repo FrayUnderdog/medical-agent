@@ -63,6 +63,10 @@
                   <dd id="sumAge">Not provided</dd>
                 </div>
                 <div>
+                  <dt>Primary concern</dt>
+                  <dd id="sumPrimary">Not provided</dd>
+                </div>
+                <div>
                   <dt>Symptoms</dt>
                   <dd id="sumSymptoms">Not provided</dd>
                 </div>
@@ -71,12 +75,20 @@
                   <dd id="sumDuration">Not provided</dd>
                 </div>
                 <div>
+                  <dt>Body part / location</dt>
+                  <dd id="sumBodyLoc">Not provided</dd>
+                </div>
+                <div>
                   <dt>Allergies</dt>
                   <dd id="sumAllergies">Not provided</dd>
                 </div>
                 <div>
                   <dt>Conditions</dt>
                   <dd id="sumConditions">Not provided</dd>
+                </div>
+                <div>
+                  <dt>Suggested department</dt>
+                  <dd id="sumDept">Not provided</dd>
                 </div>
                 <div>
                   <dt>Risk level</dt>
@@ -89,7 +101,7 @@
                 New session
               </button>
               <p class="muted" style="margin-top: 14px; font-size: 0.75rem; line-height: 1.5">
-                Session summary is generated from this conversation and sent with each request.
+                Summary updates from each assistant response (rule-based demo, not a diagnosis).
               </p>
               <p class="muted" style="margin-top: 10px; font-size: 0.75rem">
                 <strong>session:</strong> <span id="sessionIdDisplay">—</span>
@@ -117,6 +129,14 @@
               <p class="muted" style="padding: 12px 16px 0; margin: 0; font-size: 0.75rem">
                 Not medical advice. If you believe you are having an emergency, use the <a href="/static/pages/emergency.html">Emergency</a> page or call local emergency services.
               </p>
+              <details class="dev-trace" id="devTracePanel" style="margin: 12px 16px 16px">
+                <summary style="cursor: pointer; font-size: 0.8125rem; user-select: none">Developer trace</summary>
+                <pre
+                  id="devTraceBody"
+                  class="muted"
+                  style="white-space: pre-wrap; font-size: 0.75rem; max-height: 280px; overflow: auto; margin-top: 8px"
+                ></pre>
+              </details>
             </section>
           </div>
         </div>

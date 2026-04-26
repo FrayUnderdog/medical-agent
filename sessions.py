@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
+from typing import Any
 from uuid import uuid4
 
 
@@ -14,6 +15,7 @@ class Session:
 
     last_triage_level: str | None = None
     last_extracted_symptoms: list[str] = field(default_factory=list)
+    patient_intake: dict[str, Any] = field(default_factory=dict)
 
 
 class SessionStore:

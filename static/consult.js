@@ -21,8 +21,11 @@
     return {
       name: null,
       age: null,
+      primary: null,
       symptoms: [],
       duration: null,
+      bodyLoc: null,
+      department: null,
       allergies: [],
       conditions: [],
       risk: "unknown",
@@ -89,8 +92,11 @@
     var out = {
       name: patch.name != null && patch.name !== "" ? patch.name : base.name,
       age: patch.age != null && patch.age !== "" ? patch.age : base.age,
+      primary: patch.primary != null && patch.primary !== "" ? patch.primary : base.primary,
       symptoms: uniqCi((base.symptoms || []).concat(patch.symptoms || [])),
       duration: patch.duration != null && patch.duration !== "" ? patch.duration : base.duration,
+      bodyLoc: patch.bodyLoc != null && patch.bodyLoc !== "" ? patch.bodyLoc : base.bodyLoc,
+      department: patch.department != null && patch.department !== "" ? patch.department : base.department,
       allergies: uniqCi((base.allergies || []).concat(patch.allergies || [])),
       conditions: uniqCi((base.conditions || []).concat(patch.conditions || [])),
       risk: patch.risk || base.risk,
@@ -283,8 +289,11 @@
       summaryState = mergeStates(defaultSummaryState(), {
         name: o.name,
         age: o.age,
+        primary: o.primary,
         symptoms: o.symptoms,
         duration: o.duration,
+        bodyLoc: o.bodyLoc,
+        department: o.department,
         allergies: o.allergies,
         conditions: o.conditions,
         risk: o.risk,
@@ -325,11 +334,13 @@
 
     setText("sumName", summaryState.name, "Not provided");
     setText("sumAge", summaryState.age, "Not provided");
+    setText("sumPrimary", summaryState.primary, "Not provided");
 
     var sym = summaryState.symptoms && summaryState.symptoms.length ? summaryState.symptoms.join(", ") : null;
     setText("sumSymptoms", sym, "Not provided");
 
     setText("sumDuration", summaryState.duration, "Not provided");
+    setText("sumBodyLoc", summaryState.bodyLoc, "Not provided");
 
     var alg = summaryState.allergies && summaryState.allergies.length ? summaryState.allergies.join(", ") : null;
     setText("sumAllergies", alg, "Not provided");
@@ -337,14 +348,54 @@
     var cond = summaryState.conditions && summaryState.conditions.length ? summaryState.conditions.join(", ") : null;
     setText("sumConditions", cond, "Not provided");
 
+    setText("sumDept", summaryState.department, "Not provided");
+
     var riskEl = document.getElementById("sumRisk");
     if (!riskEl) return;
     var r = (summaryState.risk || "unknown").toLowerCase();
-    if (r !== "unknown" && r !== "routine" && r !== "monitor" && r !== "emergency") r = "unknown";
+    if (r === "self_care") r = "routine";
+    if (r !== "unknown" && r !== "routine" && r !== "monitor" && r !== "emergency" && r !== "urgent") r = "unknown";
 
     riskEl.textContent = r.charAt(0).toUpperCase() + r.slice(1);
     riskEl.setAttribute("data-risk", r);
     riskEl.className = "risk-badge risk-badge--" + r;
+  }
+
+  function applyPatientSummaryFromServer(ps) {
+    if (!ps || typeof ps !== "object") return;
+    var bodyLoc =
+      ps.body_location_label ||
+      [ps.side_or_location, ps.body_part].filter(Boolean).join(" ").trim() ||
+      null;
+    summaryState = {
+      name: ps.name || null,
+      age: ps.age || null,
+      primary: ps.chief_complaint || null,
+      symptoms: Array.isArray(ps.symptoms) ? ps.symptoms : [],
+      duration: ps.duration || null,
+      bodyLoc: bodyLoc,
+      department: ps.likely_department || null,
+      allergies: Array.isArray(ps.allergies) ? ps.allergies : [],
+      conditions: Array.isArray(ps.chronic_conditions) ? ps.chronic_conditions : [],
+      risk: (ps.risk_level || "unknown").toLowerCase(),
+    };
+    persistSummary();
+    renderSummary();
+  }
+
+  function updateDevTrace(data) {
+    var pre = document.getElementById("devTraceBody");
+    if (!pre) return;
+    var kr = (data.tool_outputs && data.tool_outputs.knowledge_rag) || {};
+    var payload = {
+      tool_trace: data.tool_trace || [],
+      retrieval_trace: kr.retrieval_trace || null,
+      sources: kr.sources || [],
+      patient_intake: data.tool_outputs && data.tool_outputs.patient_intake,
+      guardrails: data.tool_outputs && data.tool_outputs.guardrails,
+      triage: data.tool_outputs && data.tool_outputs.triage_suggestion,
+    };
+    pre.textContent = JSON.stringify(payload, null, 2);
   }
 
   function updateSessionIdDisplay(id) {
@@ -427,16 +478,6 @@
     var wrap = el("div", "");
     var bubble = el("div", "msg__bubble", data.reply || "");
     wrap.appendChild(bubble);
-
-    var meta = el("div", "msg__meta");
-    var tri = data.triage_level || "—";
-    var triBadge = el("span", "badge", "Triage: " + tri);
-    if (tri === "emergency" || data.guardrail_triggered) triBadge.classList.add("badge--emergency");
-    meta.appendChild(triBadge);
-    meta.appendChild(
-      el("span", "badge", data.guardrail_triggered ? "Guardrail: triggered" : "Guardrail: clear")
-    );
-    wrap.appendChild(meta);
     row.appendChild(wrap);
     messagesEl.appendChild(row);
     scrollBottom();
@@ -498,6 +539,8 @@
       if (!res.ok) throw new Error(res.status + " " + raw.slice(0, 240));
       var data = JSON.parse(raw);
       setSessionId(data.session_id);
+      applyPatientSummaryFromServer(data.patient_summary);
+      updateDevTrace(data);
       appendAssistant(data);
     } catch (e) {
       appendError(
@@ -523,16 +566,6 @@
         e.preventDefault();
         sendMessage();
       }
-    });
-
-    var debTimer = null;
-    inputEl.addEventListener("input", function () {
-      clearTimeout(debTimer);
-      debTimer = setTimeout(function () {
-        var v = (inputEl.value || "").trim();
-        if (!v) return;
-        applyUserText(v);
-      }, 450);
     });
 
     document.querySelectorAll("[data-chip]").forEach(function (btn) {

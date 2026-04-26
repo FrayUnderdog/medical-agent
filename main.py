@@ -51,6 +51,7 @@ def chat(req: ChatRequest) -> ChatResponse:
         retrieval_provider=result.retrieval_provider,
         tool_trace=result.tool_trace,
         tool_outputs=result.tool_outputs,
+        patient_summary=result.patient_summary,
     )
 
 app.include_router(mcp_router)

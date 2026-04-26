@@ -20,4 +20,8 @@ class ChatResponse(BaseModel):
     retrieval_provider: str | None = None
     tool_trace: list[dict[str, Any]] = Field(default_factory=list)
     tool_outputs: dict = Field(default_factory=dict)
+    patient_summary: dict[str, Any] | None = Field(
+        default=None,
+        description="Structured summary for UI; not a diagnosis.",
+    )
 
