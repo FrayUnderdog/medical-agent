@@ -12,6 +12,7 @@ from model import get_default_model_client
 from orchestrator import Orchestrator
 from schemas import ChatRequest, ChatResponse
 from sessions import SessionStore
+from mcp_server import router as mcp_router
 
 load_dotenv()
 
@@ -51,6 +52,8 @@ def chat(req: ChatRequest) -> ChatResponse:
         tool_trace=result.tool_trace,
         tool_outputs=result.tool_outputs,
     )
+
+app.include_router(mcp_router)
 
 
 app.mount("/static", StaticFiles(directory=str(_STATIC_DIR)), name="static")
