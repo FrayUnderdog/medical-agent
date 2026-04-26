@@ -123,7 +123,11 @@ class Orchestrator:
         kprov = knowledge.output.get("retrieval_provider")
         krerank = knowledge.output.get("reranker_used")
         ksrc = knowledge.output.get("sources") or []
-        ksum = f"top_k={knowledge.output.get('top_k')}, rerank={bool(krerank)}, sources={ksrc[:3]}"
+        krt = knowledge.output.get("retrieval_trace") or {}
+        ksum = (
+            f"top_k={knowledge.output.get('top_k')}, rerank={bool(krerank)}, "
+            f"fb={krt.get('fallback_triggered')}, sources={ksrc[:3]}"
+        )
         trace.append(
             _trace(
                 knowledge.name,

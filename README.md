@@ -86,22 +86,33 @@ Optional:
 
 ## Minimal RAG (LangChain + Chroma)
 
-This repo includes a tiny local RAG pipeline over markdown files in `docs/medical_knowledge/`.
+This repo includes a tiny local RAG pipeline over markdown files under `docs/medical_knowledge/` **recursively** (`**/*.md`), including the offline **seed pack** in `docs/medical_knowledge/nhs_seed/`.
 
 - Vectors are persisted locally in `chroma_db/`.
 - Embeddings use OpenAI `text-embedding-3-small` when `OPENAI_API_KEY` is set.
 - If embeddings fail or the key is missing, it falls back to simple keyword retrieval.
+- Each indexed chunk carries metadata: `source`, `filepath`, `title`, and `knowledge_source` (`offline_seed` under `nhs_seed/`, `offline_root` for files at the corpus root).
+
+**Re-indexing after corpus changes:** documents are added to Chroma only when the collection is empty (first run). To pick up new or updated Markdown files, **delete the local `chroma_db/` folder** once (with the server stopped), ensure `OPENAI_API_KEY` is set, then start again so embeddings rebuild.
+
+## Hybrid medical knowledge retrieval
+
+- **Offline seed pack:** ~40 patient-facing Markdown topics in `docs/medical_knowledge/nhs_seed/` (plus existing root topics), written as general education—not diagnosis.
+- **Local retrieval first:** Chroma similarity search with `recall_top_k = 20`, then optional **BGE reranker** (`rerank_top_n = 3`).
+- **Confidence gate:** if offline hit count or normalised relevance scores fall below configured thresholds, the pipeline **may** call the optional **NHS Content API** client (`nhs_content_client.py`) and attach results as **transient context** (nothing is written back into Chroma in v1).
+- **Trace:** `tool_outputs["knowledge_rag"]["retrieval_trace"]` records offline counts/scores, fallback flags, NHS enablement, result counts, selected sources, and latency. The chat `reply` text is unchanged for end users; traces stay in `tool_outputs` / developer tooling.
+- **NHS is optional:** set `NHS_API_KEY` (and optionally `NHS_API_BASE_URL`) only if you subscribe to the NHS Website Content API. **Without `NHS_API_KEY`, the app runs fully offline**; when the gate would call NHS but no key is present, the trace includes `fallback_skipped: "missing_api_key"` and no exception is raised.
 
 ## Two-stage RAG (optional reranking)
 
 When Chroma + embeddings are available, retrieval is **two-stage**:
 
-- **Embedding recall**: fetch `recall_top_k = 6` candidate chunks (fast, high-recall).
-- **Reranker precision**: optionally rerank candidates with a local **BGE reranker** and keep `rerank_top_n = 3` final chunks (higher precision for the final answer).
+- **Embedding recall**: fetch `recall_top_k = 20` candidate chunks (fast, high-recall).
+- **Reranker precision**: optionally rerank candidates (plus any transient NHS snippets) with a local **BGE reranker** and keep `rerank_top_n = 3` final chunks (higher precision for the final answer).
 
 Why these numbers for a demo:
 
-- `6` candidates gives the reranker enough choices without slowing down much.
+- `20` candidates give the reranker enough choices for a confidence gate while staying small for a demo.
 - `3` final chunks keeps prompts short and explainable in an interview.
 
 Fallback behavior (stability-first):
@@ -116,6 +127,13 @@ Fallback behavior (stability-first):
 
 ```bash
 python run_eval.py
+python test_rag_coverage.py
+```
+
+Quick syntax check:
+
+```bash
+python -m compileall .
 ```
 
 ## Frontend demo flow

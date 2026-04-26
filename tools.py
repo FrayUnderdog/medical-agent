@@ -179,6 +179,7 @@ def knowledge_rag_tool(query: str, *, top_k: int = 4) -> ToolResult:
         "sources": res.sources,
         "top_k": res.top_k,
         "retrieval_provider": res.retrieval_provider,
+        "retrieval_trace": res.retrieval_trace,
     }
     if res.retrieval_provider == "keyword_fallback":
         output["retrieval_error"] = res.retrieval_error
