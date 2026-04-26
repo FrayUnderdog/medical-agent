@@ -21,6 +21,52 @@
     input: document.getElementById("messageInput"),
     sendBtn: document.getElementById("sendBtn"),
     exampleBtns: document.querySelectorAll("[data-example]"),
+    // Views + nav
+    viewLabel: document.getElementById("viewLabel"),
+    viewHome: document.getElementById("viewHome"),
+    viewChat: document.getElementById("viewChat"),
+    viewEmergency: document.getElementById("viewEmergency"),
+    viewTriage: document.getElementById("viewTriage"),
+    viewDept: document.getElementById("viewDept"),
+    viewSummary: document.getElementById("viewSummary"),
+    devPanel: document.getElementById("devPanel"),
+    navHome: document.getElementById("navHome"),
+    navChat: document.getElementById("navChat"),
+    navTriage: document.getElementById("navTriage"),
+    navDept: document.getElementById("navDept"),
+    navSummary: document.getElementById("navSummary"),
+    devToggleBtn: document.getElementById("devToggleBtn"),
+    devCloseBtn: document.getElementById("devCloseBtn"),
+    // View widgets
+    intakeForm: document.getElementById("intakeForm"),
+    intakeAge: document.getElementById("intakeAge"),
+    intakeSex: document.getElementById("intakeSex"),
+    intakeSymptoms: document.getElementById("intakeSymptoms"),
+    startConsultBtn: document.getElementById("startConsultBtn"),
+    goChatBtn: document.getElementById("goChatBtn"),
+    emergencyText: document.getElementById("emergencyText"),
+    mockCallBtn: document.getElementById("mockCallBtn"),
+    backToChatBtn: document.getElementById("backToChatBtn"),
+    triageCard: document.getElementById("triageCard"),
+    triageToDeptBtn: document.getElementById("triageToDeptBtn"),
+    triageToSummaryBtn: document.getElementById("triageToSummaryBtn"),
+    triageToChatBtn: document.getElementById("triageToChatBtn"),
+    deptCard: document.getElementById("deptCard"),
+    deptToSummaryBtn: document.getElementById("deptToSummaryBtn"),
+    deptToChatBtn: document.getElementById("deptToChatBtn"),
+    summaryCard: document.getElementById("summaryCard"),
+    clinicalNote: document.getElementById("clinicalNote"),
+    debugSummary: document.getElementById("debugSummary"),
+    debugTrace: document.getElementById("debugTrace"),
+    debugOutputs: document.getElementById("debugOutputs"),
+  };
+
+  var appState = {
+    view: "home",
+    intake: { age: "", sex: "", symptoms: "" },
+    lastUserMessage: null,
+    lastResponse: null,
+    transcript: [],
   };
 
   function pad(n) {
@@ -93,6 +139,10 @@
     if (els.messages) els.messages.innerHTML = "";
     if (els.emergencyStrip) els.emergencyStrip.classList.add("hidden");
     showWelcome();
+    appState.lastUserMessage = null;
+    appState.lastResponse = null;
+    appState.transcript = [];
+    renderAllViews();
   }
 
   function clearSession() {
@@ -102,6 +152,58 @@
 
   function isEmergencyResponse(data) {
     return data.triage_level === "emergency" || data.guardrail_triggered === true;
+  }
+
+  function setNavActive(id) {
+    [els.navHome, els.navChat, els.navTriage, els.navDept, els.navSummary].forEach(function (b) {
+      if (!b) return;
+      if (b.id === id) b.setAttribute("aria-current", "page");
+      else b.removeAttribute("aria-current");
+    });
+  }
+
+  function setView(view) {
+    appState.view = view;
+    if (els.viewLabel) {
+      var label =
+        view === "home"
+          ? "Home"
+          : view === "chat"
+            ? "Consultation"
+            : view === "triage"
+              ? "Triage"
+              : view === "dept"
+                ? "Department"
+                : view === "summary"
+                  ? "Summary"
+                  : "Emergency";
+      els.viewLabel.textContent = label;
+    }
+    if (els.viewHome) els.viewHome.classList.toggle("hidden", view !== "home");
+    if (els.viewChat) els.viewChat.classList.toggle("hidden", view !== "chat");
+    if (els.viewTriage) els.viewTriage.classList.toggle("hidden", view !== "triage");
+    if (els.viewDept) els.viewDept.classList.toggle("hidden", view !== "dept");
+    if (els.viewSummary) els.viewSummary.classList.toggle("hidden", view !== "summary");
+    if (els.viewEmergency) els.viewEmergency.classList.toggle("hidden", view !== "emergency");
+
+    setNavActive(
+      view === "home"
+        ? "navHome"
+        : view === "chat"
+          ? "navChat"
+          : view === "triage"
+            ? "navTriage"
+            : view === "dept"
+              ? "navDept"
+              : "navSummary"
+    );
+  }
+
+  function toggleDevPanel(visible) {
+    if (!els.devPanel) return;
+    var show = visible != null ? !!visible : els.devPanel.classList.contains("hidden");
+    if (show) els.devPanel.classList.remove("hidden");
+    else els.devPanel.classList.add("hidden");
   }
 
   function setEmergencyStrip(visible) {
@@ -256,6 +358,220 @@
     scrollChatToBottom();
   }
 
+  function computeDepartment(triageLevel, guardrailTriggered) {
+    if (guardrailTriggered || triageLevel === "emergency") {
+      return {
+        title: "Emergency Department (ER)",
+        detail:
+          "This looks like a potential emergency. In a real product, we would recommend immediate evaluation in the ER or calling emergency services.",
+        tagClass: "border-red-300 bg-red-50 text-red-900 dark:border-red-700 dark:bg-red-950 dark:text-red-50",
+      };
+    }
+    if (triageLevel === "urgent") {
+      return {
+        title: "Urgent Care / Same-day Clinic",
+        detail:
+          "This may need prompt evaluation today. In a real workflow we’d route to urgent care, a same-day clinic slot, or telehealth escalation.",
+        tagClass:
+          "border-amber-300 bg-amber-50 text-amber-900 dark:border-amber-600 dark:bg-amber-950 dark:text-amber-100",
+      };
+    }
+    if (triageLevel === "routine") {
+      return {
+        title: "Primary Care / Routine visit",
+        detail:
+          "This appears non-urgent. A routine primary care visit (or self-care with monitoring) is reasonable depending on risk factors.",
+        tagClass:
+          "border-sky-300 bg-sky-50 text-sky-900 dark:border-sky-700 dark:bg-sky-950 dark:text-sky-100",
+      };
+    }
+    return {
+      title: "Self-care + watchful waiting",
+      detail:
+        "This appears low acuity. Provide supportive care, monitor symptoms, and seek care if worsening or new red flags appear.",
+      tagClass:
+        "border-emerald-300 bg-emerald-50 text-emerald-900 dark:border-emerald-700 dark:bg-emerald-950 dark:text-emerald-100",
+    };
+  }
+
+  function buildClinicalNote(userMessage, data) {
+    var tool = (data && data.tool_outputs) || {};
+    var se = tool.symptom_extraction || {};
+    var tri = tool.triage_suggestion || {};
+    var rag = tool.knowledge_rag || {};
+    var gr = tool.guardrails || {};
+
+    var lines = [];
+    lines.push("CLINICAL HANDOFF NOTE (DEMO)");
+    lines.push("—");
+    lines.push("Chief complaint:");
+    lines.push("- " + (userMessage || "—"));
+    lines.push("");
+    lines.push("Structured extraction:");
+    lines.push("- symptoms: " + JSON.stringify(se.symptoms || []));
+    lines.push("- duration_days: " + (se.duration_days == null ? "null" : String(se.duration_days)));
+    lines.push("");
+    lines.push("Safety policy / guardrails:");
+    lines.push("- triggered: " + String(!!data.guardrail_triggered));
+    lines.push("- severity: " + (gr.severity || "null"));
+    lines.push("- matched_rule_ids: " + JSON.stringify(gr.matched_rule_ids || []));
+    lines.push("- matched_phrases: " + JSON.stringify(gr.matched_phrases || []));
+    lines.push("- reason: " + (gr.reason || "—"));
+    lines.push("");
+    lines.push("Triage:");
+    lines.push("- triage_level: " + (data.triage_level || tri.triage_level || "—"));
+    lines.push("");
+    lines.push("Retrieval:");
+    lines.push("- retrieval_provider: " + (data.retrieval_provider || "—"));
+    lines.push("- sources: " + JSON.stringify(rag.sources || []));
+    if (rag.reranker_used != null) {
+      lines.push("- reranker_used: " + String(!!rag.reranker_used));
+      lines.push("- recall_top_k: " + String(rag.recall_top_k || 0) + ", rerank_top_n: " + String(rag.rerank_top_n || 0));
+    }
+    lines.push("");
+    lines.push("Retrieved context (truncated):");
+    var ctx = (rag.retrieved_context || "").trim();
+    lines.push(ctx ? ctx.slice(0, 800) + (ctx.length > 800 ? "…" : "") : "—");
+    lines.push("");
+    lines.push("Tool trace:");
+    lines.push(JSON.stringify(data.tool_trace || [], null, 2));
+    return lines.join("\n");
+  }
+
+  function renderDebug(data) {
+    if (!els.debugSummary || !els.debugTrace || !els.debugOutputs) return;
+    if (!data) {
+      els.debugSummary.textContent = "Send a message to see debug metadata.";
+      els.debugTrace.textContent = "";
+      els.debugOutputs.textContent = "";
+      return;
+    }
+    var rag = (data.tool_outputs && data.tool_outputs.knowledge_rag) || {};
+    var sources = rag.sources || [];
+    var provider = data.retrieval_provider || rag.retrieval_provider || "—";
+    var triage = data.triage_level || "—";
+    var rerank = rag.reranker_used != null ? String(!!rag.reranker_used) : "—";
+
+    els.debugSummary.innerHTML = "";
+    els.debugSummary.appendChild(el("div", "text-sm font-semibold text-slate-800 dark:text-slate-100", "Latest response"));
+    var ul = el("ul", "mt-2 list-inside list-disc text-sm text-slate-700 dark:text-slate-200");
+    ul.appendChild(el("li", "", "triage_level: " + triage));
+    ul.appendChild(el("li", "", "retrieval_provider: " + provider));
+    ul.appendChild(el("li", "", "reranker_used: " + rerank));
+    ul.appendChild(el("li", "", "retrieved_sources: " + (sources.length ? sources.join(", ") : "—")));
+    els.debugSummary.appendChild(ul);
+
+    els.debugTrace.textContent = JSON.stringify(data.tool_trace || [], null, 2);
+    els.debugOutputs.textContent = JSON.stringify(data.tool_outputs || {}, null, 2);
+  }
+
+  function renderDepartment(data) {
+    if (!els.deptCard) return;
+    if (!data) {
+      els.deptCard.textContent = "Send a message first to generate a recommendation.";
+      return;
+    }
+    var rec = computeDepartment(data.triage_level, data.guardrail_triggered);
+    els.deptCard.innerHTML = "";
+    var tag = el("div", "inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold " + rec.tagClass, rec.title);
+    els.deptCard.appendChild(tag);
+    els.deptCard.appendChild(el("p", "mt-3 text-sm text-slate-700 dark:text-slate-200", rec.detail));
+  }
+
+  function renderTriage(data) {
+    if (!els.triageCard) return;
+    if (!data) {
+      els.triageCard.textContent = "Send a message first to generate a triage result.";
+      return;
+    }
+    var tool = data.tool_outputs || {};
+    var se = tool.symptom_extraction || {};
+    var symptoms = se.symptoms || [];
+    var duration = se.duration_days;
+    var triage = data.triage_level || "—";
+    var emergency = isEmergencyResponse(data);
+
+    var next =
+      triage === "urgent"
+        ? "Recommended next step: get same-day evaluation (urgent care / clinician)."
+        : triage === "routine"
+          ? "Recommended next step: routine visit or monitor with supportive care."
+          : triage === "self_care"
+            ? "Recommended next step: self-care + monitor; seek care if worsening."
+            : "Recommended next step: emergency evaluation now.";
+
+    els.triageCard.innerHTML = "";
+    var badge = el(
+      "div",
+      "inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold " + triageBadgeClass(triage),
+      emergency ? "EMERGENCY" : String(triage).toUpperCase().replace(/_/g, " ")
+    );
+    els.triageCard.appendChild(badge);
+    els.triageCard.appendChild(
+      el(
+        "p",
+        "mt-3 text-sm text-slate-700 dark:text-slate-200",
+        "Symptoms: " + (symptoms.length ? symptoms.join(", ").replace(/_/g, " ") : "—")
+      )
+    );
+    els.triageCard.appendChild(
+      el(
+        "p",
+        "mt-1 text-sm text-slate-700 dark:text-slate-200",
+        "Duration: " + (duration == null ? "—" : String(duration) + " day(s)")
+      )
+    );
+    els.triageCard.appendChild(el("p", "mt-3 text-sm font-semibold text-slate-900 dark:text-white", next));
+  }
+
+  function renderSummary(data) {
+    if (!els.summaryCard) return;
+    if (!data) {
+      els.summaryCard.textContent = "Send a message first to generate a summary.";
+      return;
+    }
+    var tool = data.tool_outputs || {};
+    var se = tool.symptom_extraction || {};
+    var symptoms = se.symptoms || [];
+    var duration = se.duration_days;
+    var triage = data.triage_level || "—";
+    var dept = computeDepartment(data.triage_level, data.guardrail_triggered).title;
+
+    els.summaryCard.innerHTML = "";
+    els.summaryCard.appendChild(el("div", "text-sm font-semibold text-slate-900 dark:text-white", "Patient summary"));
+    var ul = el("ul", "mt-2 list-inside list-disc text-sm text-slate-700 dark:text-slate-200");
+    ul.appendChild(el("li", "", "symptoms: " + (symptoms.length ? symptoms.join(", ").replace(/_/g, " ") : "—")));
+    ul.appendChild(el("li", "", "duration_days: " + (duration == null ? "—" : String(duration))));
+    ul.appendChild(el("li", "", "triage_level: " + String(triage)));
+    ul.appendChild(el("li", "", "next_step: " + dept));
+    els.summaryCard.appendChild(ul);
+  }
+
+  function renderEmergency(data) {
+    if (!els.emergencyText) return;
+    var msg = (data && data.reply) || "Potential emergency detected. Please seek emergency care now.";
+    els.emergencyText.textContent = msg;
+  }
+
+  function renderClinical(data) {
+    if (!els.clinicalNote) return;
+    if (!data) {
+      els.clinicalNote.textContent = "Send a message first to generate a clinical note.";
+      return;
+    }
+    els.clinicalNote.textContent = buildClinicalNote(appState.lastUserMessage, data);
+  }
+
+  function renderAllViews() {
+    var d = appState.lastResponse;
+    renderDebug(d);
+    renderDepartment(d);
+    renderTriage(d);
+    renderSummary(d);
+    renderEmergency(d);
+    renderClinical(d);
+  }
+
   function appendErrorBubble(message) {
     hideWelcome();
     var wrap = el("div", "flex justify-start mb-4");
@@ -319,6 +635,16 @@
       setSessionId(data.session_id);
       updateSessionDisplay();
       appendAssistantCard(data);
+      appState.lastUserMessage = text;
+      appState.lastResponse = data;
+      appState.transcript.push({ role: "user", content: text });
+      appState.transcript.push({ role: "assistant", content: data.reply || "" });
+      renderAllViews();
+      if (isEmergencyResponse(data)) {
+        setView("emergency");
+      } else {
+        setView("triage");
+      }
     } catch (e) {
       appendErrorBubble("Something went wrong. " + (e && e.message ? e.message : String(e)));
     } finally {
@@ -332,6 +658,44 @@
     if (els.clearBtn) els.clearBtn.addEventListener("click", clearSession);
     if (els.newChatBtn) els.newChatBtn.addEventListener("click", clearSession);
     if (els.sendBtn) els.sendBtn.addEventListener("click", sendMessage);
+    if (els.navHome) els.navHome.addEventListener("click", function () { setView("home"); });
+    if (els.navChat) els.navChat.addEventListener("click", function () { setView("chat"); });
+    if (els.navTriage) els.navTriage.addEventListener("click", function () { setView("triage"); });
+    if (els.navDept) els.navDept.addEventListener("click", function () { setView("dept"); });
+    if (els.navSummary) els.navSummary.addEventListener("click", function () { setView("summary"); });
+    if (els.devToggleBtn) els.devToggleBtn.addEventListener("click", function () { toggleDevPanel(); });
+    if (els.devCloseBtn) els.devCloseBtn.addEventListener("click", function () { toggleDevPanel(false); });
+
+    if (els.backToChatBtn) els.backToChatBtn.addEventListener("click", function () { setView("chat"); });
+    if (els.mockCallBtn) {
+      els.mockCallBtn.addEventListener("click", function () {
+        alert("Demo only: In a real product this would initiate an emergency call workflow.");
+      });
+    }
+    if (els.triageToDeptBtn) els.triageToDeptBtn.addEventListener("click", function () { setView("dept"); });
+    if (els.triageToSummaryBtn) els.triageToSummaryBtn.addEventListener("click", function () { setView("summary"); });
+    if (els.triageToChatBtn) els.triageToChatBtn.addEventListener("click", function () { setView("chat"); });
+    if (els.deptToSummaryBtn) els.deptToSummaryBtn.addEventListener("click", function () { setView("summary"); });
+    if (els.deptToChatBtn) els.deptToChatBtn.addEventListener("click", function () { setView("chat"); });
+
+    if (els.goChatBtn) els.goChatBtn.addEventListener("click", function () { setView("chat"); });
+    if (els.intakeForm) {
+      els.intakeForm.addEventListener("submit", function (e) {
+        e.preventDefault();
+        var age = (els.intakeAge && els.intakeAge.value ? els.intakeAge.value : "").trim();
+        var sex = els.intakeSex && els.intakeSex.value ? els.intakeSex.value : "";
+        var sym = (els.intakeSymptoms && els.intakeSymptoms.value ? els.intakeSymptoms.value : "").trim();
+        appState.intake = { age: age, sex: sex, symptoms: sym };
+        if (sym) {
+          els.input.value =
+            (age ? "Age: " + age + ". " : "") +
+            (sex ? "Sex: " + sex + ". " : "") +
+            sym;
+        }
+        setView("chat");
+        if (els.input) els.input.focus();
+      });
+    }
 
     if (els.input) {
       els.input.addEventListener("keydown", function (e) {
@@ -357,6 +721,8 @@
     setInterval(tickClock, 1000);
     updateSessionDisplay();
     wire();
+    setView("home");
+    renderAllViews();
     if (els.input) els.input.focus();
   }
 

@@ -118,6 +118,18 @@ Fallback behavior (stability-first):
 python run_eval.py
 ```
 
+## Frontend demo flow
+
+Open the app root page and walk through the views:
+
+- **Home / Symptom Intake**: lightweight intake form (optional age/sex + symptom text) that seeds the consultation message.
+- **Chat Consultation**: sends messages to `POST /chat` and shows the assistant reply.
+- **Emergency View**: automatically shown when `guardrail_triggered=true` or `triage_level=emergency` (includes a clearly-labeled mock “call” button).
+- **Triage Result**: patient-facing summary (symptoms, duration, triage, next step).
+- **Department Recommendation**: simple routing suggestion derived from `triage_level` (mocked).
+- **Clinical Note Summary**: concise handoff summary + an expanded note (demo format).
+- **Developer panel (collapsible)**: shows `retrieval_provider`, `reranker_used`, retrieved sources, `tool_trace`, and raw `tool_outputs`.
+
 ## Tool schema (interview)
 
 Each pipeline step is documented as a **`ToolSpec`** (`tool_specs.py`): `name`, `description`, `input_fields`, `output_fields`. The registry **`TOOL_SPECS`** maps tool name → spec (including **guardrails** as the pre-step, plus all `ToolResult.name` values from `tools.py`).

@@ -39,3 +39,65 @@ html {
 textarea:focus {
   outline: none;
 }
+
+.nav-btn {
+  border: 1px solid rgb(226 232 240);
+  background: rgb(248 250 252);
+  color: rgb(51 65 85);
+  padding: 0.4rem 0.7rem;
+  border-radius: 0.75rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.nav-btn:hover {
+  background: rgb(241 245 249);
+}
+
+.dark .nav-btn {
+  border-color: rgb(51 65 85);
+  background: rgb(30 41 59);
+  color: rgb(226 232 240);
+}
+
+.dark .nav-btn:hover {
+  background: rgb(51 65 85);
+}
+
+.nav-btn[aria-current="page"] {
+  border-color: rgb(13 148 136);
+  background: rgb(240 253 250);
+  color: rgb(15 118 110);
+}
+
+.dark .nav-btn[aria-current="page"] {
+  border-color: rgb(13 148 136);
+  background: rgb(19 78 74);
+  color: rgb(153 246 228);
+}
+
+#devPanel {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  background: rgba(15, 23, 42, 0.35);
+  backdrop-filter: blur(6px);
+}
+
+.dev-panel-card {
+  position: absolute;
+  right: 1rem;
+  bottom: 1rem;
+  width: min(720px, calc(100vw - 2rem));
+  max-height: calc(100vh - 2rem);
+  overflow: auto;
+  border: 1px solid rgb(226 232 240);
+  background: white;
+  border-radius: 1rem;
+  box-shadow: 0 18px 60px rgba(2, 6, 23, 0.25);
+}
+
+.dark .dev-panel-card {
+  border-color: rgb(51 65 85);
+  background: rgb(15 23 42);
+}
